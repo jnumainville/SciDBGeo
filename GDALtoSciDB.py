@@ -67,13 +67,14 @@ def GDALtoSciDB():
     yWindow = 100
     rasterArrayName = 'glc2000'
     rasterPath = '/home/04489/dhaynes/glc2000.tif'
-    tempFilePath = '/home/04489/dhaynes'
+    tempFileOutPath = '/mnt'
+    tempFileSciDBLoadPath = '/data/04489/dhaynes'
 
     sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
-    ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempFilePath, chunkSize, chunkOverlap)
+    ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempFileOutPath, tempFileSciDBLoadPath, chunkSize, chunkOverlap)
 
 
-def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempdirectory, chunk=1000, overlap=0):
+def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, tempSciDBLoad, chunk=1000, overlap=0):
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     import timeit
@@ -87,16 +88,22 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempdirectory, chunk
 
     for version_num, y in enumerate(range(0, height,yWindow)):
         tempRastName = 'temprast_%s' % (version_num)
-        csvPath = '%s/%s.sdbbin' % (tempdirectory,tempRastName)
+        csvPath = '%s/%s.sdbbin' % (tempOutDirectory,tempRastName)
         #with open(csvPath, 'wb') as fileout:
         totalstart = timeit.default_timer()    
         rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=yWindow)
         rasterValueDataType = rArray.dtype
         if version_num == 0:
+            #arrays = sdb.list_arrays().keys()
+            arrays = sdb.query("list('arrays')")
+            print(arrays, dir(arrays))
+            
             sdb.query("create array %s <value:%s> [y=0:%s,%s,%s, x=0:%s,%s,%s]" %  (rasterArrayName, rasterValueDataType, width-1, chunk, overlap, height-1, chunk, overlap) )
             # CreateGlobalArray(sdb, rasterArrayName, rasterValueDataType, width, height, chunk)
         start = timeit.default_timer()
+        print(csvPath)
         WriteMultiDimensionalArray(rArray, csvPath)
+        os.chmod(csvPath, 755)
         stop = timeit.default_timer()
 
         writeBinaryTime = stop-start
@@ -106,7 +113,8 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempdirectory, chunk
         sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
         #print("load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, csvPath, rasterValueDataType))
         start = timeit.default_timer()
-        sdb.query("load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, csvPath, rasterValueDataType))
+        binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
+        sdb.query("load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType))
         stop = timeit.default_timer() 
         loadBinaryTime = stop-start
 
@@ -137,7 +145,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempdirectory, chunk
 
 def WriteMultiDimensionalArray(rArray, csvPath ):
 
-    with open(csvPath, 'wb') as fileout:
+    with open(csvPath, 'w') as fileout:
         arrayHeight, arrayWidth = rArray.shape
         it = np.nditer(rArray, flags=['multi_index'], op_flags=['readonly'])
         for pixel in it:
@@ -173,6 +181,9 @@ def CleanUpTemp(sdb, rasterArrayName, version_num, csvPath, tempRastName):
     sdb.query("remove(%s)" % (tempRastName))
     os.remove(csvPath)
 
+
+if __name__ == '__main__':
+    GDALtoSciDB()
 
 # load(small, '/home/scidb/data/scidb_analysis/small2.bin', -2, '(int64, int64, int32)');
 # {xy} x1,y1,value
