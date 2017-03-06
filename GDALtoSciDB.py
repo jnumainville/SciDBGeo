@@ -65,11 +65,12 @@ def GDALtoSciDB():
     chunkSize = 100000
     chunkOverlap = 0
     yWindow = 100
-    rasterArrayName = 'meris2010_fast'
-    rasterPath = '/home/scidb/data/ESACCI_300m_2010.tif'
+    rasterArrayName = 'glc2000'
+    rasterPath = '/home/04489/dhaynes/glc2000.tif'
+    tempFilePath = '/home/04489/dhaynes'
 
-    sdb = connect()
-    ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, r"/home/scidb/data", chunkSize, chunkOverlap)
+    sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+    ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempFilePath, chunkSize, chunkOverlap)
 
 
 def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempdirectory, chunk=1000, overlap=0):
