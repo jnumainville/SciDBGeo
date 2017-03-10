@@ -96,14 +96,14 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         if version_num == 0:
             #arrays = sdb.list_arrays().keys()
             arrays = sdb.query("list('arrays')")
-            print(arrays, dir(arrays))
+            #print(arrays, dir(arrays))
             
             sdb.query("create array %s <value:%s> [y=0:%s,%s,%s, x=0:%s,%s,%s]" %  (rasterArrayName, rasterValueDataType, width-1, chunk, overlap, height-1, chunk, overlap) )
             # CreateGlobalArray(sdb, rasterArrayName, rasterValueDataType, width, height, chunk)
         start = timeit.default_timer()
-        print(csvPath)
+        #print(csvPath)
         WriteMultiDimensionalArray(rArray, csvPath)
-        os.chmod(csvPath, 755)
+        os.chmod(csvPath, 0o755)
         stop = timeit.default_timer()
 
         writeBinaryTime = stop-start
@@ -136,6 +136,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
             print('Took %s seconds to complete' % (totalTime))
             print("Writing time: %s, Loading time: %s, Redimension time: %s " % (writeBinaryTime, loadBinaryTime, redimensionArrayTime) )
             print('Estimated time to load (%s) = time %s * loop %s' % ( totalTime*NumberOfIterations,  totalTime, NumberOfIterations) )
+            CleanUpTemp(sdb, rasterArrayName, version_num, csvPath, tempRastName)
         
             
             #Still don't know how this is working
@@ -145,10 +146,10 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
 
 def WriteMultiDimensionalArray(rArray, csvPath ):
 
-    with open(csvPath, 'w') as fileout:
+    with open(csvPath, 'wb') as fileout:
         arrayHeight, arrayWidth = rArray.shape
         it = np.nditer(rArray, flags=['multi_index'], op_flags=['readonly'])
-        for pixel in it:
+        for counter, pixel in enumerate(it):
             row, col = it.multi_index
 
             indexvalue = np.array([row,col], dtype=np.dtype('int64'))
@@ -156,8 +157,10 @@ def WriteMultiDimensionalArray(rArray, csvPath ):
             #print(dir(indexvalue))
 
             #Integer 32
-            #print(it.value.dtype)
-            fileout.write('%s%s' % (indexvalue.tobytes(), it.value.tobytes()) )
+            #if counter <= 10:
+            #   print(it.value.dtype, row, col, it.value, indexvalue.tobytes(), it.value.tobytes() )
+            fileout.write( indexvalue.tobytes() )
+            fileout.write( it.value.tobytes() )
 
             # if col == arrayWidth-1 and row == arrayHeight-1:
             #     fileout.write(indexvalue.tobytes() )
@@ -172,12 +175,14 @@ def WriteMultiDimensionalArray(rArray, csvPath ):
 
 def CreateGlobalArray(sdb, rasterArrayName, valuetype, width, height, chunk=1000, overlap=0):
     'This function is use for creating the final array'
+    pass
     
     
     
 def CleanUpTemp(sdb, rasterArrayName, version_num, csvPath, tempRastName):
     'Remove all temporary files'
-    sdb.query("remove_versions(%s, %s)" % (rasterArrayName, version_num))
+    if version_num > 0:
+       sdb.query("remove_versions(%s, %s)" % (rasterArrayName, version_num))
     sdb.query("remove(%s)" % (tempRastName))
     os.remove(csvPath)
 
