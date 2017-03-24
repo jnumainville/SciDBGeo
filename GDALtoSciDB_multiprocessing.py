@@ -49,19 +49,24 @@ def AssignSciDBInstance(aProcess,theProcesses):
     return instance
 
 
-def RasterPrep(rasterPath, readWindow, ):
+def RasterPrep(rasterPath, readWindow, sdbHost, destArrayName ):
     """
     This function does an initial read on the raster file and creates the necessary metadata
     """
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     from collections import OrderedDict
-
+    
     raster = gdal.Open(rasterPath, GA_ReadOnly)
     width = raster.RasterXSize 
     height  = raster.RasterYSize
     rArray = raster.ReadAsArray(xoff=0, yoff=0, xsize=width, ysize=1)
     rasterValueDataType = rArray.dtype
+
+    from scidbpy import connect
+    sdb =connect(sdbHost)
+    CreateDestinationArray(sdb, width, height, destArrayName, rasterValueDataType)
+    del sdb 
 
     NumberOfIterations = int(round( height/float(readWindow) +.5))
 
@@ -69,8 +74,7 @@ def RasterPrep(rasterPath, readWindow, ):
 
     #Setting the readwindow to the default, except for the last short read
     for r in rasterMetadata:
-        if rasterMetadata[r]["ReadWindow"] >= readWindow:
-            rasterMetadata[r]["ReadWindow"] = 100
+        if rasterMetadata[r]["ReadWindow"] > readWindow: rasterMetadata[r]["ReadWindow"] = readWindow
 
     #rasterMetadata = orderedDict(  [(str(n): "ReadWindow": height - version_num*yWindow)]) 
     del raster
@@ -84,6 +88,7 @@ def argument_parser():
     import argparse
     parser = argparse.ArgumentParser(description= "multiprocessing module for loading GDAL read data into SciDB with multiple instances")    
     parser.add_argument("--processes", required =True, help="Number of SciDB Instances for parallel data loading", dest="processes")    
+    parser.add_argument("--host", required =True, help="SciDB host for connection", dest="host")    
     parser.add_argument("--raster", required =True, help="Input file path for the raster", dest="rasterPath")    
     parser.add_argument("--dest", required =True, help="Name of the destination array", dest="rasterName")
     parser.add_argument("--window", required =False, help="Size in rows of the read window, default: 100", dest="window", default=100)
@@ -100,14 +105,18 @@ def argument_parser():
     #rasterPath = '/home/04489/dhaynes/glc2000.tif'
     #tempFilePath = '/home/04489/dhaynes'
 
-def PrepareMultiDimensionalArray(sdb, width, height, rasterArrayName, rasterValueDataType):
+def CreateDestinationArray(sdb, width, height, rasterArrayName, rasterValueDataType):
     """
 
     """
+    try:
+        #Create final destination array           
+        sdb.query("create array %s <value:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, rasterValueDataType, width-1, height-1) )
+    except:
+        print("Found existing array with same name removing...")
+        sdb.query("remove(%s)" % (rasterArrayName))
+        sdb.query("create array %s <value:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, rasterValueDataType, width-1, height-1) )
 
-    #Create final destination array           
-    #sdb.query("create array %s <value:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, rasterValueDataType, width-1, height-1) )
-    pass
 
 
 def WriteMultiDimensionalArray(rArray, binaryFilePath):
@@ -183,7 +192,7 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType
 
 def main(pyVersion, numProcesses, rasterFilePath):
     """
-
+    This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
     pool = mp.Pool(numProcesses)
 
@@ -204,7 +213,7 @@ if __name__ == '__main__':
     pythonVersion = sys.version_info
 
     args = argument_parser().parse_args()
-    arrayReadSettings = RasterPrep(args.rasterPath, int(args.window))
+    arrayReadSettings = RasterPrep(args.rasterPath, int(args.window), args.host, args.rasterName)
     main(pythonVersion, int(args.processes), args.rasterPath)
 
     
