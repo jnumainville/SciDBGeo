@@ -34,8 +34,13 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         rasterValueDataType = rArray.dtype
 
         if version_num == 0:
-            #Create final destination array           
-            sdb.query("create array %s <%s:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, height-1) )
+            #Create final destination array
+            try:           
+                sdb.query("create array %s <%s:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, height-1) )
+            except:
+                print("Array already exists removing")
+                sdb.query("drop array %s" % (rasterArrayName))
+                sdb.query("create array %s <%s:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, height-1) )
             #pass
         
         #Write the Array to Binary file
@@ -45,9 +50,14 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         stop = timeit.default_timer()
         writeBinaryTime = stop-start
                     
-        #Create the array, which will hold the read in data. X and Y coordinates are different on purpose 
-        sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
-        
+        #Create the array, which will hold the read in data. X and Y coordinates are different on purpose
+        try: 
+            sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+        except:
+            #Silently deleting temp arrays
+            sdb.query("drop array %s" % (tempRastName))
+            sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+
         #Time the loading of binary file
         start = timeit.default_timer()
         binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
@@ -129,8 +139,6 @@ def argument_parser():
 #     yWindow = 100
 #     rasterArrayName = 'MERIS_2010'
 #     rasterPath = '/home/04489/dhaynes/data/ESACCI_300m_2010.tif'
-
-
 #     sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
     
 
