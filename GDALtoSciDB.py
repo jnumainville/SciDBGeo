@@ -2,7 +2,7 @@ import numpy as np
 from collections import defaultdict
 from itertools import groupby, cycle, product
 from scidbpy import connect
-import os
+import os, argparse
 
 
 
@@ -116,9 +116,10 @@ def argument_parser():
     parser.add_argument('-SciDBArray', required=True, dest='SciArray')
     parser.add_argument('-RasterPath', required=True, dest='Raster')
     parser.add_argument('-Host', required=True, dest='Host')
-    parser.add_argument('-Chunksize', required=False, dest='Chunk', default=100000)
-    parser.add_argument('-Overlap', required=False, dest='Overlap', default=0)
-    parser.add_argument('-Y_window', required=True, dest='Window', default=100)
+    parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=100000)
+    parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
+    parser.add_argument('-Y_window', required=True, dest='Window', type=int, default=100)
+    parser.add_argument('-att_name', required=True, dest='Attributes', default="value")
     
     return parser
 
@@ -135,11 +136,11 @@ def argument_parser():
 
 if __name__ == '__main__':
     args = argument_parser().parse_args()
-    if os.path.exists(args.RasterPath):
+    if os.path.exists(args.Raster):
         sdb = connect(args.Host)
         tempFileOutPath = '/mnt'
         tempFileSciDBLoadPath = '/data/04489/dhaynes'
-        ReadGDALFile(sdb, args.SciArray, args.Raster, args.Window, tempFileOutPath, tempFileSciDBLoadPath, args.Chunk, args.Overlap)
+        ReadGDALFile(sdb, args.SciArray, args.Raster, args.Window, tempFileOutPath, tempFileSciDBLoadPath, args.Attributes, args.Chunk, args.Overlap)
     else:
         print("Not a valid Raster Path")
 
