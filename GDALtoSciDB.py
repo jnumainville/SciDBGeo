@@ -1,80 +1,12 @@
 import numpy as np
 from collections import defaultdict
 from itertools import groupby, cycle, product
-
 from scidbpy import connect
-#from osgeo import gdal
-import os
-
-
-# byte format for binary scidb data
-typemap = {'bool': np.dtype('<b1'),
-           'int8': np.dtype('<b'),
-           'uint8': np.dtype('<B'),
-           'int16': np.dtype('<h'),
-           'uint16': np.dtype('<H'),
-           'int32': np.dtype('<i'),
-           'uint32': np.dtype('<I'),
-           'int64': np.dtype('<l'),
-           'uint64': np.dtype('<L'),
-           'float': np.dtype('<f4'),
-           'double': np.dtype('<d'),
-           'char': np.dtype('c'),
-           'datetime': np.dtype('<M8[s]'),
-           'datetimetz': np.dtype([(str('time'), '<M8[s]'), (str('tz'), '<m8[s]')]),
-           'string': np.dtype('object')
-           }
-
-null_typemap = dict(((k, False), v) for k, v in typemap.items())
-null_typemap.update(((k, True), [(str('mask'), np.dtype('<B')), (str('data'), v)])
-                    for k, v in typemap.items())
-
-# NULL value for each datatype
-NULLS = defaultdict(lambda: np.nan)
-NULLS['bool'] = np.float32(np.nan)
-NULLS['string'] = None
-NULLS['float'] = np.float32(np.nan)
-NULLS['datetime'] = np.datetime64('NaT')
-NULLS['datetimetz'] = np.zeros(1, dtype=typemap['datetimetz'])
-NULLS['datetimetz']['time'] = np.datetime64('NaT')
-NULLS['datetimetz']['tz'] = np.datetime64('NaT')
-NULLS['datetimetz'] = NULLS['datetimetz'][0]
-NULLS['char'] = '\0'
-
-for k in typemap:
-    NULLS[typemap[k]] = NULLS[k]
-
-# numpy datatype that each sdb datatype should be promoted to
-# if nullable
-NULL_PROMOTION = defaultdict(lambda: np.float)
-NULL_PROMOTION['float'] = np.dtype('float32')
-NULL_PROMOTION['datetime'] = np.dtype('<M8[s]')
-NULL_PROMOTION['datetimetz'] = np.dtype('<M8[s]')
-NULL_PROMOTION['char'] = np.dtype('c')
-NULL_PROMOTION['string'] = object
-
-# numpy datatype that each sdb datatype should be converted to
-# if not nullable
-mapping = typemap.copy()
-mapping['datetimetz'] = np.dtype('<M8[s]')
-mapping['string'] = object
+import os, argparse
 
 
 
-def GDALtoSciDB():
-    chunkSize = 100000
-    chunkOverlap = 0
-    yWindow = 100
-    rasterArrayName = 'MERIS_2010'
-    rasterPath = '/home/04489/dhaynes/data/ESACCI_300m_2010.tif'
-    tempFileOutPath = '/mnt'
-    tempFileSciDBLoadPath = '/data/04489/dhaynes'
-
-    sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
-    ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempFileOutPath, tempFileSciDBLoadPath, chunkSize, chunkOverlap)
-
-
-def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, tempSciDBLoad, chunk=1000, overlap=0):
+def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, tempSciDBLoad, attribute="value", chunk=1000, overlap=0):
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     import timeit
@@ -102,8 +34,13 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         rasterValueDataType = rArray.dtype
 
         if version_num == 0:
-            #Create final destination array           
-            sdb.query("create array %s <value:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, rasterValueDataType, width-1, height-1) )
+            #Create final destination array
+            try:           
+                sdb.query("create array %s <%s:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, height-1) )
+            except:
+                print("Array already exists removing")
+                sdb.query("drop array %s" % (rasterArrayName))
+                sdb.query("create array %s <%s:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, height-1) )
             #pass
         
         #Write the Array to Binary file
@@ -113,9 +50,14 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         stop = timeit.default_timer()
         writeBinaryTime = stop-start
                     
-        #Create the array, which will hold the read in data. X and Y coordinates are different on purpose 
-        sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
-        
+        #Create the array, which will hold the read in data. X and Y coordinates are different on purpose
+        try: 
+            sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+        except:
+            #Silently deleting temp arrays
+            sdb.query("drop array %s" % (tempRastName))
+            sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+
         #Time the loading of binary file
         start = timeit.default_timer()
         binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
@@ -179,7 +121,38 @@ def CleanUpTemp(sdb, rasterArrayName, version_num, csvPath, tempRastName):
     sdb.query("remove(%s)" % (tempRastName))
     os.remove(csvPath)
 
+def argument_parser():
+    parser = argparse.ArgumentParser(description="Load GDAL dataset into SciDB")   
+    parser.add_argument('-SciDBArray', required=True, dest='SciArray')
+    parser.add_argument('-RasterPath', required=True, dest='Raster')
+    parser.add_argument('-Host', required=True, dest='Host')
+    parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=100000)
+    parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
+    parser.add_argument('-Y_window', required=True, dest='Window', type=int, default=100)
+    parser.add_argument('-att_name', required=True, dest='Attributes', default="value")
+    
+    return parser
+
+# def GDALtoSciDB():
+#     chunkSize = 100000
+#     chunkOverlap = 0
+#     yWindow = 100
+#     rasterArrayName = 'MERIS_2010'
+#     rasterPath = '/home/04489/dhaynes/data/ESACCI_300m_2010.tif'
+#     sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+    
 
 if __name__ == '__main__':
-    GDALtoSciDB()
+    args = argument_parser().parse_args()
+    if os.path.exists(args.Raster):
+        sdb = connect(args.Host)
+        tempFileOutPath = '/mnt'
+        tempFileSciDBLoadPath = '/data/04489/dhaynes'
+        ReadGDALFile(sdb, args.SciArray, args.Raster, args.Window, tempFileOutPath, tempFileSciDBLoadPath, args.Attributes, args.Chunk, args.Overlap)
+    else:
+        print("Not a valid Raster Path")
+
+        #GDALtoSciDB()
+        #ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, False, args.CSV)
+
 
