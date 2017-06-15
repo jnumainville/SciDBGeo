@@ -15,8 +15,6 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
     width = raster.RasterXSize 
     height  = raster.RasterYSize
 
-    
-    ##test to make sure global array exists
 
     for version_num, y in enumerate(range(0, height,yWindow)):
         tempRastName = 'temprast_%s' % (version_num)
@@ -36,12 +34,12 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         if version_num == 0:
             #Create final destination array
             try:           
-                sdb.query("create array %s <%s:%s> [x=0:%s,%s,0; y=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, chunk, height-1, chunk) )
+                sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
             except:
                 print("Array %s already exists. Removing" % (rasterArrayName))
                 sdb.query("remove(%s)" % (rasterArrayName))
-                sdb.query("create array %s <%s:%s> [x=0:%s,%s,0; y=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, chunk, height-1, chunk) )
-            #pass
+                sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
+
         
         #Write the Array to Binary file
         start = timeit.default_timer()      
@@ -126,7 +124,7 @@ def argument_parser():
     parser.add_argument('-SciDBArray', required=True, dest='SciArray')
     parser.add_argument('-RasterPath', required=True, dest='Raster')
     parser.add_argument('-Host', required=False, default=None, dest='Host')
-    parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=100000)
+    parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=1000)
     parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
     parser.add_argument('-Y_window', required=True, dest='Window', type=int, default=100)
     parser.add_argument('-att_name', required=True, dest='Attributes', default="value")
