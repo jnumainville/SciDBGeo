@@ -36,11 +36,11 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         if version_num == 0:
             #Create final destination array
             try:           
-                sdb.query("create array %s <%s:%s> [x=0:%s,?,0; y=0:%s,?,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, height-1) )
+                sdb.query("create array %s <%s:%s> [x=0:%s,%s,0; y=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, chunk, height-1, chunk) )
             except:
-                print("Array already exists removing")
-                sdb.query("remove(%)s" % (rasterArrayName))
-                sdb.query("create array %s <%s:%s> [x=0:%s,?,0; y=0:%s,?,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, height-1) )
+                print("Array %s already exists. Removing" % (rasterArrayName))
+                sdb.query("remove(%s)" % (rasterArrayName))
+                sdb.query("create array %s <%s:%s> [x=0:%s,%s,0; y=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, width-1, chunk, height-1, chunk) )
             #pass
         
         #Write the Array to Binary file
@@ -55,7 +55,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
             sdb.query("create array %s <y1:int64, x1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
         except:
             #Silently deleting temp arrays
-            sdb.query("drop array %s" % (tempRastName))
+            sdb.query("remove(%s)" % (tempRastName))
             sdb.query("create array %s <y1:int64, x1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
 
         #Time the loading of binary file
@@ -105,8 +105,9 @@ def WriteMultiDimensionalArray(rArray, csvPath ):
         it = np.nditer(rArray, flags=['multi_index'], op_flags=['readonly'])
         for counter, pixel in enumerate(it):
             col, row = it.multi_index
+            #if counter < 100: print("column: %s, row: %s" % (col, row))
 
-            indexvalue = np.array([row,col], dtype=np.dtype('int64'))
+            indexvalue = np.array([col,row], dtype=np.dtype('int64'))
 
             fileout.write( indexvalue.tobytes() )
             fileout.write( it.value.tobytes() )
@@ -124,7 +125,7 @@ def argument_parser():
     parser = argparse.ArgumentParser(description="Load GDAL dataset into SciDB")   
     parser.add_argument('-SciDBArray', required=True, dest='SciArray')
     parser.add_argument('-RasterPath', required=True, dest='Raster')
-    parser.add_argument('-Host', required=True, default=None, dest='Host')
+    parser.add_argument('-Host', required=False, default=None, dest='Host')
     parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=100000)
     parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
     parser.add_argument('-Y_window', required=True, dest='Window', type=int, default=100)
@@ -147,8 +148,11 @@ if __name__ == '__main__':
         sdb = connect(args.Host)
         #tempFileOutPath = '/mnt'
         #tempFileSciDBLoadPath = '/data/04489/dhaynes'
-        tempFileSciDBLoadPath = tempFileOutPath = '/home/scidb/scidb_data/0/0'
-        ReadGDALFile(sdb, args.SciArray, args.Raster, args.Window, tempFileOutPath, tempFileSciDBLoadPath, args.Attributes, args.Chunk, args.Overlap)
+        if sdb:
+            tempFileSciDBLoadPath = tempFileOutPath = '/home/scidb/scidb_data/0/0'
+            ReadGDALFile(sdb, args.SciArray, args.Raster, args.Window, tempFileOutPath, tempFileSciDBLoadPath, args.Attributes, args.Chunk, args.Overlap)
+        else:
+            print('Not Valid connection: %s' % (args.Host))
     else:
         print("Not a valid Raster Path")
 
