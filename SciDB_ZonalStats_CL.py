@@ -98,8 +98,54 @@ def OptimalZonalStats(sdb, SciDBArray, polygonSciDBArray, minY, minX):
     #limit(insert(redimension(apply(py1496072375503176173_00001, x, i0+4548, y, i1+6187, value, f0), junkArray ), junkArray), 100);
 
     #py1496072375503176173_00001,
+    #py1496075988591369127_00001
+    # AFL% show(py1496075988591369127_00001);
+    # {i} schema
+    # {0} 'py1496075988591369127_00001<f0:int16> [i0=0:2783:0:1000; i1=0:6474:0:1000]'
+
+    # AFL% show(GLC2000);
+    # {i} schema
+    # {0} 'GLC2000<value:uint8> [y=0:40319:0:1000; x=0:16352:0:1000]'
+
+
+    equi_join(between(GLC2000, 4548, 6187, 4548, 6197), between(py1496075988591369127_00001, 0, 0, 10, 10), 'left_ids=~0,~1', 'right_ids=~0,~1');
+
+    limit(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, value, f0), 'left_ids=~0,~1', 'right_ids=~0,~1'), 20);
+    limit(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, value, f0), 'left_ids=~0,~1', 'right_names=x,y'), 20);
+
+    equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, value, f0), 'left_names=x,y', 'right_names=x,y');
+
+    grouped_aggregate(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, id, f0), 'left_ids=~0,~1', 'right_ids=~0,~1'), min(value), max(value), avg(value), count(value), id);
+
+    grouped_aggregate(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, id, f0), 'left_names=x,y', 'right_names=x,y'), min(value), max(value), avg(value), count(value), id);
+    #apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, id, f0)
+    equi_join(between(GLC2000, 0, 0, 10, 10), between(py1496075988591369127_00001, 0, 0, 10, 10), 'left_ids=~0,~1', 'right_names=~0,~1');
+
+    #equi_join(between(GLC2000, 4548, 6187, 4548, 6197), between(py1496075988591369127_00001, 0, 0, 10, 10), 'left_names=value', 'right_names=f0');
+
+    #'left_ids=~0,0', 'right_ids=1,0'
+
+def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0 ):
+    '''This function write the multidimensional array as a binary '''
+    import numpy as np
+    with open(csvPath, 'wb') as fileout:
+        arrayHeight, arrayWidth = rArray.shape
+        it = np.nditer(rArray, flags=['multi_index'], op_flags=['readonly'])
+        for counter, pixel in enumerate(it):
+            row, col = it.multi_index
+
+            indexvalue = np.array([row + xOffset, col + yOffset], dtype=np.dtype('int64'))
+
+            fileout.write( indexvalue.tobytes() )
+            fileout.write( it.value.tobytes() )
+   
+    return(arrayHeight, arrayWidth)
+
+
 def WriteFile(filePath, theDictionary):
-    "This function writes out the dictionary as csv"
+    """
+    This function writes out the dictionary as csv
+    """
     
     thekeys = list(theDictionary.keys())
     
@@ -121,11 +167,39 @@ def QueryResults():
     result = afl.grouped_aggregate(afl.join(polygonSciDBArray.name, afl.subarray(SciDBArray, ulY, ulX, lrY, lrX)), max("value"), "f0")
     #query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), f0)" % (polygonSciDBArray.name, SciDBArray, ulY, ulX, lrY, lrX)
 
+def LoadPolygonArray(sdb, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, chunk_size=1000):
+    """ 
+    This function will be used instead of the from array function in scidbpy
+    """
+    rasterArrayName = "mask"
+
+    try:
+        sdbquery = "create array %s <value:%s> [y=%s:%s,%s,0; x=%s:%s,%s,0]" %  (rasterArrayName, rasterValueDataType, ulY, lrY, chunk_size, ulX, lrX, chunk_size)
+        print(sdbquery)
+        sdb.query(sdbquery)
+        binaryLoadPath = '%s/%s.scidb' % (tempSciDBLoad,tempRastName )
+        sdbquery = "create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType)
+        print(sdbquery)
+        sdb.query(sdbquery)
+        sdbquery = "load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType)
+        print(sdbquery)
+        sdb.query(sdbquery)
+        sdbquery = "insert(redimension(apply( {A}, x, x1+{yOffset}, y, y1+{xOffset} ), {B} ), {B})".format(A=tempRastName, B=rasterArrayName, yOffset=ulY, xOffset=ulX)
+        print(sdbquery)
+        sdb.query(sdbquery)
+    except:
+        sdb.query("remove(%s)" % (rasterArrayName))
+        sdb.query("remove(%s)" % (tempRastName))
+        #LoadPolygonArray(sdb, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, 1000)
+
+    
+
 def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, optimized=False, filePath=None):
     "This function conducts zonal stats in SciDB"
     
     outDictionary = OrderedDict()
-    
+    sdb = scidbpy.connect()
+
     for t in range(NumberofTests):
         theTest = "test_%s" % (t+1)
         #outDictionary[theTest]
@@ -139,25 +213,35 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, optimized=Fa
 
         start = timeit.default_timer()
         rasterizedArray = RasterizePolygon(rasterPath, r'/home/scidb/data/nothing.tiff', boundaryPath)
+        rasterValueDataType = rasterizedArray.dtype
         stop = timeit.default_timer()
         rasterizeTime = stop-start
         print("Rasterization time %s for file %s" % (rasterizeTime, boundaryPath ))
         
-        #Transfering Raster Array to SciDB
-        sdb = scidbpy.connect()
-        start = timeit.default_timer()
-        polygonSciDBArray = sdb.from_array(rasterizedArray, instance_id=0, persistent=False)
-        stop = timeit.default_timer()
-        transferTime = stop-start
-        
 
         ulX, ulY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
         lrX, lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
+
         if optimized:
-            OptimalZonalStats(sdb, SciDBArray, polygonSciDBArray, ulY, ulX,)
+            csvPath = '/home/scidb/scidb_data/0/0/polygon.scidb'
+            WriteMultiDimensionalArray(rasterizedArray, csvPath, ulX, ulY )    
+            tempRastName = csvPath.split('/')[-1].split('.')[0]
+            tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
+            LoadPolygonArray(sdb, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, 1000)
+            #OptimalZonalStats(sdb, SciDBArray, polygonSciDBArray, ulY, ulX,)
         else:
-            #afl = sdb.afl
-            #afl.subarray()
+            #Transfering Raster Array to SciDB
+            start = timeit.default_timer()
+            #polygonSciDBArray = sdb.from_array(rasterizedArray, instance_id=0, persistent=False, chunk_size=1000) 
+
+            polygonSciDBArray = sdb.from_array(rasterizedArray, dim_low=(4000,5000), dim_high=(5000,7000), instance_id=0, chunk_size=1000) 
+            #name="states"
+
+            stop = timeit.default_timer()
+            transferTime = stop-start
+            print(transferTime)
+
+            #Raster Summary Stats
             query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), f0)" % (polygonSciDBArray.name, SciDBArray, ulY, ulX, lrY, lrX)
             start = timeit.default_timer()
             #print(query)
@@ -166,9 +250,8 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, optimized=Fa
             queryTime = stop-start
     
             print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t+1 ))
-
             outDictionary[theTest] = OrderedDict( [ ("test",theTest), ("SciDBArrayName",SciDBArray), ("BoundaryFilePath",boundaryPath), ("transfer_time",transferTime), ("rasterization_time",rasterizeTime), ("query_time",queryTime), ("total_time",transferTime+rasterizeTime+queryTime) ] )
-            #outDictionary[theTest] = OrderedDict( [ ("test"), (theTest), "SciDBArrayName" : SciDBArray, "BoundaryFilePath": boundaryPath, "transfer_time": transferTime, "rasterization_time": rasterizeTime, "query_time": queryTime, "total_time": transferTime+rasterizeTime+queryTime ] )
+    
 
     sdb.reap()
     if filePath:
@@ -191,14 +274,13 @@ def argument_parser():
     parser.add_argument('-Shapefile', required=True, dest='Shapefile')
     parser.add_argument('-Tests', type=int, help="Number of tests you want to run", required=False, default=3, dest='Runs')
     parser.add_argument('-CSV', required=False, dest='CSV')
+    parser.add_argument('-Optimal', type=bool, default=False, required=False, dest='optimal')
     return parser
-
-
 
 if __name__ == '__main__':
     args = argument_parser().parse_args()
     if CheckFiles(args.Shapefile, args.Raster):
-        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, False, args.CSV)
+        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, args.optimal, args.CSV)
     # else:
     #     print(args)
 
