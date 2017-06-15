@@ -67,22 +67,23 @@ def RasterizePolygon(inRasterPath, outRasterPath, vectorPath):
 
     return bandArray
 
-def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad, xMin, yMin, xMax, yMax):
+def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad, tempRastName, xMin, yMin, xMax, yMax, verbose=False):
     """
     Trying to figure this out
-    1. Make an empty raster that matches the SciDBArray
+    1. Make an empty raster "Mask "that matches the SciDBArray
     2. Load the data into a 1D array
+    3. Redimension and insert data into the mask array
+    4. Conduct a global join using the between operators
     """
     import re
     afl = sdb.afl
     tempArray = "mask"
-    tempRastName = "zones"
 
     theArray = afl.show(SciDBArray)
     results = theArray.contents()
     #SciDBArray()\n[('polygon<x:int64,y:int64,id:int16> [xy=0:*:0:1000000]')]\n
     #[('GLC2000<value:uint8> [x=0:40319:0:100000; y=0:16352:0:100000]')]
-    #R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(?:\s*)\[(?P<dim_1>\S+)\]')
+    
     #R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>\S+)(\])')
     R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>[^\]]+)')
     results = results.lstrip('results').strip()
@@ -104,66 +105,26 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
         sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
         sdb.query(sdbquery)
 
-    LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, "x1", "y1")
-    #LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, dim1="x", dim2="y")
-
+    LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, "x1", "y1", verbose)
     
-    #"SciDBArray()\n[('GLC2000<value:uint8> [y=0:40319:0:1000; x=0:16352:0:1000]')]\n"
-    #Get regular expressions match
-    #ydimension = r"(\[)([a-zA-Z]*)(=)([0-9]*)(:)([0-9]*)(:|,)([0-9]*)(:|,)([0-9]*)(;|])"
-    #xdimension = r"x=[0-9]*:[0-9]*:[0-9]*:[0-9]*\]"
-
-    # dimension r"(\[)([a-zA-Z]*)(=)([0-9]*)(:)([0-9]*)(:|,)([0-9]*)(:|,)([0-9]*)(;|])"
-
-    # pattern= r"(SciDBArray\(\)\n\[\(')(%s)(<value:)([a-z0-9]*>)(\s)*(%s)(;\s)(%s)" % (SciDBArray, ydimension, xdimension)
-    # matches = re.match(pattern, theArray.contents())
-    
-    # start = timeit.default_timer()   
-    # #create empty array
-    # sciquery = ("create array %s %s%s %s; %s" % (tempArray, matches.groups()[2], "int16>", matches.groups()[5], matches.groups()[7]) )
-    # print(sciquery)
-    # sdb.query(sciquery)
-
-    #write array in the correct spot
+    #Write the array in the correct location
+    start = timeit.default_timer()
     sdbquery ="insert(redimension(apply({A}, x, x1+{yOffSet}, y, y1+{xOffset}, value, id), {B} ), {B})".format( A=tempRastName, B=tempArray, yOffSet=yMin, xOffset=xMin)
-    print(sdbquery)
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     insertTime = stop-start
-    print(insertTime)
+    if verbose: print(sdbquery , insertTime)
     
     #between(GLC2000, 4548, 6187, 7332, 12662)
-    sdbquery = "join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)" % (SciDBArray, xMin, yMin, xMax, yMax, tempArray, xMin, yMin, xMax, yMax,)
+    start = timeit.default_timer()
+    sdbquery = "grouped_aggregate(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, yMin, xMin, yMax, xMax, tempArray, yMin, xMin, yMax, xMax)
+    sdb.query(sdbquery)
+    stop = timeit.default_timer()
+    queryTime = stop-start
+    if verbose: print(sdbquery, queryTime)
 
-    #limit(insert(redimension(apply(py1496072375503176173_00001, x, i0+4548, y, i1+6187, value, f0), junkArray ), junkArray), 100);
-
-    #py1496072375503176173_00001,
-    #py1496075988591369127_00001
-    # AFL% show(py1496075988591369127_00001);
-    # {i} schema
-    # {0} 'py1496075988591369127_00001<f0:int16> [i0=0:2783:0:1000; i1=0:6474:0:1000]'
-
-    # AFL% show(GLC2000);
-    # {i} schema
-    # {0} 'GLC2000<value:uint8> [y=0:40319:0:1000; x=0:16352:0:1000]'
-
-
-    # equi_join(between(GLC2000, 4548, 6187, 4548, 6197), between(py1496075988591369127_00001, 0, 0, 10, 10), 'left_ids=~0,~1', 'right_ids=~0,~1');
-
-    # limit(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, value, f0), 'left_ids=~0,~1', 'right_ids=~0,~1'), 20);
-    # limit(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, value, f0), 'left_ids=~0,~1', 'right_names=x,y'), 20);
-
-    # equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, value, f0), 'left_names=x,y', 'right_names=x,y');
-
-    # grouped_aggregate(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, id, f0), 'left_ids=~0,~1', 'right_ids=~0,~1'), min(value), max(value), avg(value), count(value), id);
-
-    # grouped_aggregate(equi_join(between(GLC2000, 4548, 6187, 7331, 12661), apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, id, f0), 'left_names=x,y', 'right_names=x,y'), min(value), max(value), avg(value), count(value), id);
-    # #apply(py1496075988591369127_00001, x, i0+4548, y, i1+6187, id, f0)
-    # equi_join(between(GLC2000, 0, 0, 10, 10), between(py1496075988591369127_00001, 0, 0, 10, 10), 'left_ids=~0,~1', 'right_names=~0,~1');
-
-    #equi_join(between(GLC2000, 4548, 6187, 4548, 6197), between(py1496075988591369127_00001, 0, 0, 10, 10), 'left_names=value', 'right_names=f0');
-
-    #'left_ids=~0,0', 'right_ids=1,0'
+    return insertTime, queryTime
+    
 
 def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0 ):
     '''
@@ -212,58 +173,29 @@ def QueryResults():
     result = afl.grouped_aggregate(afl.join(polygonSciDBArray.name, afl.subarray(SciDBArray, ulY, ulX, lrY, lrX)), max("value"), "f0")
     #query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), f0)" % (polygonSciDBArray.name, SciDBArray, ulY, ulX, lrY, lrX)
 
-def LoadPolygonArray(sdb, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, chunk_size=1000):
-    """ 
-    This function will be used instead of the from array function in scidbpy
-    """
-    rasterArrayName = "mask"
 
-    try:
-        sdbquery = "create array %s <id:%s> [y=%s:%s,%s,0; x=%s:%s,%s,0]" %  (rasterArrayName, rasterValueDataType, ulY, lrY, chunk_size, ulX, lrX, chunk_size)
-        print(sdbquery)
-        sdb.query(sdbquery)
-        binaryLoadPath = '%s/%s.scidb' % (tempSciDBLoad,tempRastName )
-        sdbquery = "create array %s <x1:int64, y1:int64, id:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType)
-        print(sdbquery)
-        sdb.query(sdbquery)
-        sdbquery = "load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType)
-        print(sdbquery)
-        sdb.query(sdbquery)
-        sdbquery = "insert(redimension(apply( {A}, x, x1+{yOffset}, y, y1+{xOffset} ), {B} ), {B})".format(A=tempRastName, B=rasterArrayName, yOffset=ulY, xOffset=ulX)
-        print(sdbquery)
-        sdb.query(sdbquery)
-    except:
-        sdb.query("remove(%s)" % (rasterArrayName))
-        sdb.query("remove(%s)" % (tempRastName))
-        #LoadPolygonArray(sdb, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, 1000)
-
-def LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, dim1="x", dim2="y"):
+def LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, dim1="x", dim2="y", verbose=False):
     """
     Function Loads 1D array data into sciDB
+    in : 
+        sdb connection
+        tempSciDBLoad - path for loading scidbdata
+        tempRastName - Name for loading raster dataset
+        rasterValeDataType - Numpy value type
+        dim1 = name of the dimension (default = x) 
+        dim2 = name of the dimension (default = y) 
+    out : 
+        binaryLoadPath : complete path to where the file is written (*.scidb)
     """
 
     binaryLoadPath = '%s/%s.scidb' % (tempSciDBLoad,tempRastName )
     try:
         sdbquery = "create array %s <%s:int64, %s:int64, id:%s> [xy=0:*,?,?]" % (tempRastName, dim1, dim2, rasterValueDataType)
-        print(sdbquery)
         sdb.query(sdbquery)
     except:
         sdb.query("remove(%s)" % (tempRastName))
         sdbquery = "create array %s <%s:int64, %s:int64, id:%s> [xy=0:*,?,?]" % (tempRastName, dim1, dim2, rasterValueDataType)
         sdb.query(sdbquery)
-
-    return binaryLoadPath
-
-def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, verbose=False):
-    """
-    Load the polygon array in as a 1D array, shifted over
-
-    Example (equi_join(between(GLC2000, 4548, 6187, 7331, 12661)
-    grouped_aggregate(equi_join(between(GLC2000, 4548, 6187, 7332, 12662), polygon), 'left_names=x,y', 'right_names=x,y'), min(value), max(value), avg(value), count(value), id)
-
-    """
-
-    binaryLoadPath = LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType)
 
     start = timeit.default_timer()
     sdbquery = "load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType)
@@ -271,6 +203,19 @@ def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, te
     stop = timeit.default_timer()
     loadTime = stop-start
     if verbose: print(sdbquery , loadTime)
+
+    return binaryLoadPath, loadTime
+
+def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, verbose=False):
+    """
+    1. Load the polygon array in as a 1D array, shifted correctly
+    2. Peform EquiJoin using the between
+    Example (equi_join(between(GLC2000, 4548, 6187, 7331, 12661)
+    grouped_aggregate(equi_join(between(GLC2000, 4548, 6187, 7332, 12662), polygon), 'left_names=x,y', 'right_names=x,y'), min(value), max(value), avg(value), count(value), id)
+
+    """
+
+    binaryLoadPath, loadTime = LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, 'x', 'y', verbose)
     
     start = timeit.default_timer()
     sdbquery = "grouped_aggregate(equi_join(between(%s, %s, %s, %s, %s), %s, 'left_names=x,y', 'right_names=x,y'), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, ulY, ulX, lrY, lrX, tempRastName) 
@@ -317,7 +262,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, statsMode=1,
         if statsMode == 1:
             #Transfering Raster Array to SciDB
             start = timeit.default_timer()
-            polygonSciDBArray = sdb.from_array(rasterizedArray, instance_id=0, persistent=False, chunk_size=1000) 
+            polygonSciDBArray = sdb.from_array(rasterizedArray, instance_id=0, name="states", persistent=False, chunk_size=100000) 
 
             #polygonSciDBArray = sdb.from_array(rasterizedArray, dim_low=(4000,5000), dim_high=(5000,7000), instance_id=0, chunk_size=1000) 
             #name="states"
@@ -327,7 +272,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, statsMode=1,
             if verbose: print(transferTime)
 
             #Raster Summary Stats
-            query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), f0)" % (polygonSciDBArray.name, SciDBArray, ulY, ulX, lrY, lrX)
+            query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), f0)" % (polygonSciDBArray.name, SciDBArray, ulX, ulY, lrX, lrY)
             start = timeit.default_timer()
             if verbose: print(query)
             results = sdb.query(query)
@@ -335,7 +280,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, statsMode=1,
             queryTime = stop-start
 
         elif statsMode == 2:
-
             csvPath = '/home/scidb/scidb_data/0/0/polygon.scidb'
             WriteMultiDimensionalArray(rasterizedArray, csvPath, ulX, ulY )    
             tempRastName = csvPath.split('/')[-1].split('.')[0]
@@ -343,10 +287,11 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, statsMode=1,
             transferTime, queryTime = EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, tempSciDBLoad, ulY, lrY, ulX, lrX, verbose)
 
         elif statsMode == 3:
-            csvPath = '/home/scidb/scidb_data/0/0/polygon.scidb'
+            csvPath = '/home/scidb/scidb_data/0/0/zones.scidb'
             WriteMultiDimensionalArray(rasterizedArray, csvPath)
             tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
-            GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad, ulX, ulY, lrX, lrY)
+            tempRastName = csvPath.split('/')[-1].split('.')[0]
+            transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad, tempRastName, ulX, ulY, lrX, lrY, verbose)
             
         
         print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t+1 ))
