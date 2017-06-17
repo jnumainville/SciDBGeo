@@ -41,14 +41,14 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
                 sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
 
         
-        #Write the Array to Binary file
+        #Write the Array to Binary file, data is written out Column/Y, Row/X, Value
         start = timeit.default_timer()      
         aWidth, aHeight = WriteMultiDimensionalArray(rArray, csvPath)
         os.chmod(csvPath, 0o755)
         stop = timeit.default_timer()
         writeBinaryTime = stop-start
                     
-        #Create the array, which will hold the read in data. X and Y coordinates are different on purpose
+        #Create the array, which will hold the read in data. Y/Column and X/Row coordinates are different on purpose
         try: 
             sdb.query("create array %s <y1:int64, x1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
         except:
@@ -95,6 +95,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
             print('Estimated time to load (%s) = time %s * loop %s' % ( totalTime*NumberOfIterations,  totalTime, NumberOfIterations) )
             CleanUpTemp(sdb, rasterArrayName, version_num, csvPath, tempRastName)
         
+        #if version_num == 10: break
 
 def WriteMultiDimensionalArray(rArray, csvPath ):
     '''This function write the multidimensional array as a binary '''
