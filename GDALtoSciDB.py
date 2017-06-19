@@ -29,16 +29,16 @@ def CreateDestinationArray(sdb, rasterArrayName, attribute, rasterValueDataType,
         sdb.query("remove(%s)" % (rasterArrayName))
         sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
 
-def CreateLoadArray(sdb, tempRastName, rasterValueDataType):
+def CreateLoadArray(sdb, tempRastName, attribute_name, rasterValueDataType):
     """
     Create the loading 1D array
     """
     try: 
-        sdb.query("create array %s <y1:int64, x1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+        sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name, rasterValueDataType) )
     except:
         #Silently deleting temp arrays
         sdb.query("remove(%s)" % (tempRastName))
-        sdb.query("create array %s <y1:int64, x1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )    
+        sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name,rasterValueDataType) )    
 
 def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, tempSciDBLoad, attribute="value", chunk=1000, overlap=0):
     from osgeo import gdal
@@ -96,7 +96,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
             writeBinaryTime = stop-start
                         
             #Create the array, which will hold the read in data. Y/Column and X/Row coordinates are different on purpose
-            CreateLoadArray(sdb, tempRastName, rasterValueDataType)
+            CreateLoadArray(sdb, tempRastName, attribute, rasterValueDataType)
 
             #Time the loading of binary file
             start = timeit.default_timer()
@@ -159,8 +159,10 @@ def argument_parser():
     parser.add_argument('-Host', required=False, default=None, dest='Host')
     parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=1000)
     parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
-    parser.add_argument('-Y_window', required=True, dest='Window', type=int, default=100)
-    parser.add_argument('-att_name', required=True, dest='Attributes', default="value")
+    parser.add_argument('-Y_window', required=False, dest='Window', type=int, default=100)
+    parser.add_argument('-att_name', required=False, dest='Attributes', default="value")
+    parser.add_argument('-tempOut', required=False, dest='OutPath', default='/home/scidb/scidb_data/0/0')
+    parser.add_argument('-SciDBLoad', required=False, dest='SciDBLoadPath', default='/home/scidb/scidb_data/0/0')
     
     return parser
 
@@ -177,10 +179,10 @@ if __name__ == '__main__':
     args = argument_parser().parse_args()
     if os.path.exists(args.Raster):
         sdb = connect(args.Host)
-        #tempFileOutPath = '/mnt'
-        #tempFileSciDBLoadPath = '/data/04489/dhaynes'
+        tempFileOutPath = '/mnt'
+        tempFileSciDBLoadPath = '/data/04489/dhaynes'
         if sdb:
-            tempFileSciDBLoadPath = tempFileOutPath = '/home/scidb/scidb_data/0/0'
+            #tempFileSciDBLoadPath = tempFileOutPath = '/home/scidb/scidb_data/0/0'
             ReadGDALFile(sdb, args.SciArray, args.Raster, args.Window, tempFileOutPath, tempFileSciDBLoadPath, args.Attributes, args.Chunk, args.Overlap)
         else:
             print('Not Valid connection: %s' % (args.Host))
