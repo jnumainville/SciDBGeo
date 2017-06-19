@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import numpy as np
 from collections import defaultdict
 from itertools import groupby, cycle, product
@@ -389,4 +388,3 @@ if __name__ == '__main__':
         #ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, False, args.CSV)
 
 
->>>>>>> 3727f308cfd71c8ac671b49a901ae6ae4c525add
