@@ -44,6 +44,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     import timeit
+    import math
 
     raster = gdal.Open(rasterPath, GA_ReadOnly)
     width = raster.RasterXSize 
@@ -115,7 +116,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
             if scidbVersion >= 1: CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
             
             totalstop = timeit.default_timer()    
-            NumberOfIterations = int(round( width*height/chunk/chunk +.5))
+            NumberOfIterations = math.ceil(width/chunk) * math.ceil(height/chunk)
 
             print('Completed %s of %s' % (scidbVersion+1, NumberOfIterations) )
 
@@ -124,6 +125,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
                 print('Took %s seconds to complete' % (totalTime))
                 print("Writing time: %s, Loading time: %s, Redimension time: %s " % (writeBinaryTime, loadBinaryTime, redimensionArrayTime) )
                 print('Estimated time to load (%s) = time %s * loop %s' % ( totalTime*NumberOfIterations,  totalTime, NumberOfIterations) )
+                print('Estimated time in hours: %s ' % ( totalTime*NumberOfIterations/60/60) )
                 CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
 
 def WriteMultiDimensionalArray(rArray, csvPath ):
