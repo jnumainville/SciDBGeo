@@ -40,7 +40,38 @@ def CreateLoadArray(sdb, tempRastName, attribute_name, rasterValueDataType):
         sdb.query("remove(%s)" % (tempRastName))
         sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name,rasterValueDataType) )    
 
-def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, tempSciDBLoad, attribute="value", chunk=1000, overlap=0):
+def ArrayMetadata(width, height, chunk, tiles):
+    """
+    This function gathers all the metadata necessary
+    The loops are 
+    """
+    import math
+    from collections import OrderedDict
+    RasterReads = OrderedDict()
+    rowMax = 0
+    
+    for y_version, yOffSet in enumerate(range(0, height, chunk)):
+        rowsRemaining = height - y_version*chunk
+
+        #If this is not a short read, then read the correct size.
+        if rowsRemaining > chunk*tiles: rowsRemaining = chunk
+        
+        for x_version, xOffSet in enumerate(range(0, width, chunk*tiles)):
+            version_num = rowMax+x_version
+            columnsRemaining = width - x_version*chunk*tiles
+            
+            #If this is not a short read, then read the correct size.
+            if columnsRemaining > chunk*tiles : columnsRemaining = chunk*tiles
+
+            #print(rowsRemaining, columnsRemaining, version_num, x_version,y_version,)
+            RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet), ("yOffSet",yOffSet), ("xWindow", columnsRemaining), ("yWindow", rowsRemaining) ])
+        
+        rowMax += math.ceil(width/(chunk*tiles))
+
+    return RasterReads
+
+
+def ReadGDALFile(sdb, rasterArrayName, rasterPath, tempOutDirectory, tempSciDBLoad, attribute="value", chunk=1000, tiles=1,overlap=0):
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     import timeit
@@ -49,36 +80,40 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
     raster = gdal.Open(rasterPath, GA_ReadOnly)
     width = raster.RasterXSize 
     height  = raster.RasterYSize
-
+    RasterMetadata = ArrayMetadata(width, height, chunk, tiles)
     print("Width: %s, Height: %s, TotalPixels: %s" % (width, height, width*height))
-    yWindow = xWindow = chunk
+    #yWindow = xWindow = chunk
     # for version_num, y in enumerate(range(0, height,yWindow)):
     #     rowsRemaining = height - version_num*yWindow
 
-    NumberOfIterations = math.ceil(width/chunk) * math.ceil(height/chunk)
-    rowMax = 0
+    #NumberOfIterations = math.ceil(width/chunk) * math.ceil(height/chunk)
+    #rowMax = 0
     
-    for y_version, y in enumerate(range(0, height, yWindow)):
-        rowsRemaining = height - y_version*yWindow
+    # for y_version, y in enumerate(range(0, height, yWindow)):
+    #     rowsRemaining = height - y_version*yWindow
         
-        for x_version, x in enumerate(range(0, width, xWindow)):
-            columnsRemaining = width - x_version*xWindow
+    #     for x_version, x in enumerate(range(0, width, xWindow)):
+    #         columnsRemaining = width - x_version*xWindow
             
-            scidbVersion = rowMax+x_version
+    #         scidbVersion = rowMax+x_version
             
-            tempRastName = 'temprast_%s' % (scidbVersion)
-            csvPath = '%s/%s.sdbbin' % (tempOutDirectory,tempRastName)
-
-            totalstart = timeit.default_timer()     
-            #Series of optional read statements.. 1 is a full read, 2 is a ragged x read, 3 is a ragged y read, 4 is a ragged x & t read
-            if rowsRemaining >= yWindow and columnsRemaining >= xWindow:
-                rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=xWindow, ysize=yWindow)
-            elif rowsRemaining >= yWindow and columnsRemaining < xWindow:
-                rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=columnsRemaining, ysize=yWindow)
-            elif rowsRemaining < yWindow and columnsRemaining >= xWindow:
-                rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=xWindow, ysize=rowsRemaining)
-            elif rowsRemaining < yWindow and columnsRemaining < xWindow:
-                rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=columnsRemaining, ysize=rowsRemaining)
+#        
+    for scidbVersion, k in enumerate(RasterMetadata.keys()):
+        totalstart = timeit.default_timer()
+        tempRastName = 'temprast_%s' % (scidbVersion)
+        csvPath = '%s/%s.sdbbin' % (tempOutDirectory,tempRastName)
+        rArray = raster.ReadAsArray(xoff=RasterMetadata[k]["xOffSet"], yoff=RasterMetadata[k]["yOffSet"], xsize=RasterMetadata[k]["xWindow"], ysize=RasterMetadata[k]["yWindow"])
+        
+             
+    #         #Series of optional read statements.. 1 is a full read, 2 is a ragged x read, 3 is a ragged y read, 4 is a ragged x & t read
+    #         if rowsRemaining >= yWindow and columnsRemaining >= xWindow:
+    #             rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=xWindow, ysize=yWindow)
+    #         elif rowsRemaining >= yWindow and columnsRemaining < xWindow:
+    #             rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=columnsRemaining, ysize=yWindow)
+    #         elif rowsRemaining < yWindow and columnsRemaining >= xWindow:
+    #             rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=xWindow, ysize=rowsRemaining)
+    #         elif rowsRemaining < yWindow and columnsRemaining < xWindow:
+    #             rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=columnsRemaining, ysize=rowsRemaining)
 
             #print(rowsRemaining, columnsRemaining, scidbVersion, rowMax+x_version, x_version,y_version,)
             
@@ -90,50 +125,51 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
         # # else:
         # #     rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=rowsRemaining)
 
-            #Create final destination array
-            rasterValueDataType = rArray.dtype
-            if scidbVersion == 0: CreateDestinationArray(sdb, rasterArrayName, attribute, rasterValueDataType, height, width, chunk)     
+        #Create final destination array
+        rasterValueDataType = rArray.dtype
+        if scidbVersion == 0: CreateDestinationArray(sdb, rasterArrayName, attribute, rasterValueDataType, height, width, chunk)     
 
-            #Write the Array to Binary file, data is written out Column/Y, Row/X, Value
-            start = timeit.default_timer()      
-            aWidth, aHeight = WriteMultiDimensionalArray(rArray, csvPath)
-            os.chmod(csvPath, 0o755)
-            stop = timeit.default_timer()
-            writeBinaryTime = stop-start
+        #Write the Array to Binary file, data is written out Column/Y, Row/X, Value
+        start = timeit.default_timer()      
+        aWidth, aHeight = WriteMultiDimensionalArray(rArray, csvPath)
+        os.chmod(csvPath, 0o755)
+        stop = timeit.default_timer()
+        writeBinaryTime = stop-start
                         
-            #Create the array, which will hold the read in data. Y/Column and X/Row coordinates are different on purpose
-            CreateLoadArray(sdb, tempRastName, attribute, rasterValueDataType)
+        #Create the array, which will hold the read in data. Y/Column and X/Row coordinates are different on purpose
+        CreateLoadArray(sdb, tempRastName, attribute, rasterValueDataType)
 
-            #Time the loading of binary file
-            start = timeit.default_timer()
-            binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
-            sdb.query("load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType))
-            stop = timeit.default_timer() 
-            loadBinaryTime = stop-start
+        #Time the loading of binary file
+        start = timeit.default_timer()
+        binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
+        sdb.query("load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType))
+        stop = timeit.default_timer() 
+        loadBinaryTime = stop-start
 
-            #Time the redimension
-            start = timeit.default_timer()
-            sdb.query("insert(redimension(apply( {A}, y, y1+{yOffSet}, x, x1+{xOffSet} ), {B} ), {B})",A=tempRastName, B=rasterArrayName, yOffSet=y, xOffSet=x)
-            stop = timeit.default_timer() 
-            redimensionArrayTime = stop-start
+        #Time the redimension
+        start = timeit.default_timer()
+        sdb.query("insert(redimension(apply( {A}, y, y1+{yOffSet}, x, x1+{xOffSet} ), {B} ), {B})",A=tempRastName, B=rasterArrayName, yOffSet=RasterMetadata[k]["yOffSet"], xOffSet=RasterMetadata[k]["xOffSet"])
+        stop = timeit.default_timer() 
+        redimensionArrayTime = stop-start
 
-            #Clean up the temporary files
-            if scidbVersion >= 1: CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
-            
-            totalstop = timeit.default_timer()    
-            
+        #Clean up the temporary files
+        if scidbVersion >= 1: CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
+        
+        totalstop = timeit.default_timer()    
+        
 
-            print('Completed %s of %s' % (scidbVersion+1, NumberOfIterations) )
+        print('Completed %s of %s' % (scidbVersion+1, len(RasterMetadata)) )
 
-            if scidbVersion == 0:
-                totalTime = totalstop - totalstart
-                print('Took %s seconds to complete' % (totalTime))
-                print("Writing time: %s, Loading time: %s, Redimension time: %s " % (writeBinaryTime, loadBinaryTime, redimensionArrayTime) )
-                print('Estimated time to load (%s) = time %s * loop %s' % ( totalTime*NumberOfIterations,  totalTime, NumberOfIterations) )
-                print('Estimated time in hours: %s ' % ( totalTime*NumberOfIterations/60/60) )
-                CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
-#        if scidbVersion >= 300 : break
-        rowMax += x_version+1
+        if scidbVersion == 0:
+            NumberOfIterations = len(RasterMetadata)
+            totalTime = totalstop - totalstart
+            print('Took %s seconds to complete' % (totalTime))
+            print("Writing time: %s, Loading time: %s, Redimension time: %s " % (writeBinaryTime, loadBinaryTime, redimensionArrayTime) )
+            print('Estimated time to load (%s) = time %s * loop %s' % ( totalTime*NumberOfIterations,  totalTime, NumberOfIterations) )
+            print('Estimated time in hours: %s ' % ( totalTime*NumberOfIterations/60/60) )
+            CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
+# #        if scidbVersion >= 300 : break
+#         rowMax += x_version+1
 
 def WriteMultiDimensionalArray(rArray, csvPath ):
     '''This function write the multidimensional array as a binary '''
@@ -168,7 +204,7 @@ def argument_parser():
     parser.add_argument('-Host', required=False, default=None, dest='Host')
     parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=1000)
     parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
-    parser.add_argument('-Y_window', required=False, dest='Window', type=int, default=100)
+    parser.add_argument('-Tiles', required=False, dest='Tiles', type=int, default=5)
     parser.add_argument('-att_name', required=False, dest='Attributes', default="value")
     parser.add_argument('-tempOut', required=False, dest='OutPath', default='/home/scidb/scidb_data/0/0')
     parser.add_argument('-SciDBLoad', required=False, dest='SciDBLoadPath', default='/home/scidb/scidb_data/0/0')
@@ -192,7 +228,7 @@ if __name__ == '__main__':
         #tempFileSciDBLoadPath = '/data/04489/dhaynes'
         if sdb:
             #tempFileSciDBLoadPath = tempFileOutPath = '/home/scidb/scidb_data/0/0'
-            ReadGDALFile(sdb, args.SciArray, args.Raster, args.Window, args.OutPath, args.SciDBLoadPath, args.Attributes, args.Chunk, args.Overlap)
+            ReadGDALFile(sdb, args.SciArray, args.Raster, args.OutPath, args.SciDBLoadPath, args.Attributes, args.Chunk, args.Tiles, args.Overlap)
         else:
             print('Not Valid connection: %s' % (args.Host))
     else:
