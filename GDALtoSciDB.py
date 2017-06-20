@@ -55,12 +55,17 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
     # for version_num, y in enumerate(range(0, height,yWindow)):
     #     rowsRemaining = height - version_num*yWindow
 
-    for y_version, y in enumerate(range(0, height,yWindow)):
+    NumberOfIterations = math.ceil(width/chunk) * math.ceil(height/chunk)
+    rowMax = 0
+    
+    for y_version, y in enumerate(range(0, height, yWindow)):
         rowsRemaining = height - y_version*yWindow
         
         for x_version, x in enumerate(range(0, width, xWindow)):
             columnsRemaining = width - x_version*xWindow
-            scidbVersion = x_version + round(y_version*width/chunk) + y_version
+            
+            scidbVersion = rowMax+x_version
+            
             tempRastName = 'temprast_%s' % (scidbVersion)
             csvPath = '%s/%s.sdbbin' % (tempOutDirectory,tempRastName)
 
@@ -75,18 +80,18 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
             elif rowsRemaining < yWindow and columnsRemaining < xWindow:
                 rArray = raster.ReadAsArray(xoff=x, yoff=y, xsize=columnsRemaining, ysize=rowsRemaining)
 
-            #print(rowsRemaining, columnsRemaining, scidbVersion, x_version, y_version)
-        #Start timing
+            #print(rowsRemaining, columnsRemaining, scidbVersion, rowMax+x_version, x_version,y_version,)
+            
+        # #Start timing
 
-        #If then statement to account for final short read
-        # if rowsRemaining >= yWindow:    
-        #     rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=yWindow)
-        # else:
-        #     rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=rowsRemaining)
-
-            rasterValueDataType = rArray.dtype
+        # #If then statement to account for final short read
+        # # if rowsRemaining >= yWindow:    
+        # #     rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=yWindow)
+        # # else:
+        # #     rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=rowsRemaining)
 
             #Create final destination array
+            rasterValueDataType = rArray.dtype
             if scidbVersion == 0: CreateDestinationArray(sdb, rasterArrayName, attribute, rasterValueDataType, height, width, chunk)     
 
             #Write the Array to Binary file, data is written out Column/Y, Row/X, Value
@@ -116,7 +121,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
             if scidbVersion >= 1: CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
             
             totalstop = timeit.default_timer()    
-            NumberOfIterations = math.ceil(width/chunk) * math.ceil(height/chunk)
+            
 
             print('Completed %s of %s' % (scidbVersion+1, NumberOfIterations) )
 
@@ -127,6 +132,8 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, yWindow, tempOutDirectory, te
                 print('Estimated time to load (%s) = time %s * loop %s' % ( totalTime*NumberOfIterations,  totalTime, NumberOfIterations) )
                 print('Estimated time in hours: %s ' % ( totalTime*NumberOfIterations/60/60) )
                 CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
+#        if scidbVersion >= 300 : break
+        rowMax += x_version+1
 
 def WriteMultiDimensionalArray(rArray, csvPath ):
     '''This function write the multidimensional array as a binary '''
