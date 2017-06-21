@@ -132,13 +132,14 @@ def GDALReader(inParams):
     rasterValueDataType = array.dtype
 
     tempArray = "temprast_%s" % (theMetadata['version'])
-    rasterBinaryFilePath = "%s/%s.sdbbin" % (theSciDBLoadPath, tempArray)
+    rasterBinaryFilePath = "%s/%s.sdbbin" % (theSciDBOutPath, tempArray)
+    rasterBinaryLoadPath = "%s/%s.sdbbin" % (theSciDBLoadPath, tempArray)
     
     #print(current._identity[0], SciDBInstance, rArray.shape, rasterBinaryFilePath)
 
     WriteMultiDimensionalArray(array, rasterBinaryFilePath)
     CreateLoadArray(sdb, tempArray, theMetadata['attribute'], rasterValueDataType)
-    if LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryFilePath):
+    if LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryLoadPath):
         RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
 
     del raster
