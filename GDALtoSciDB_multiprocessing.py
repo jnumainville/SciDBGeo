@@ -12,7 +12,7 @@ class RasterReader(object):
         self.width, self.height, self.datatype = self.GetRasterDimensions(RasterPath)
         self.RasterMetadata = self.CreateArrayMetadata(scidbArray, self.width, self.height, chunksize, tiles, attribute)
         
-        #self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
+        self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
 
 
     def GetMetadata(self, scidbInstances,rasterFilePath, outPath, loadPath, host):
@@ -60,6 +60,7 @@ class RasterReader(object):
         
         try:           
             sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
+            print("Created array %s" % (rasterArrayName))
         except:
             print("Array %s already exists. Removing" % (rasterArrayName))
             sdb.query("remove(%s)" % (rasterArrayName))
@@ -112,13 +113,14 @@ def GDALReader(inParams):
     
     #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
     
-    #print(inParams)
+    print(inParams)
 
     theMetadata = inParams[0]
     theInstance = inParams[1]
     theRasterPath = inParams[2]
     theSciDBOutPath = inParams[3]
     theSciDBLoadPath = inParams[4]
+    sdb = connect(inParams[5])
 
 
     #print(theMetadata, theInstance, thePath)
