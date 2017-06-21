@@ -1,6 +1,7 @@
 import multiprocessing as mp
-import itertools
+import itertools, timeit
 import numpy as np
+import math
 
 class RasterReader(object):
 
@@ -104,17 +105,15 @@ def GDALReader(inParams):
     """
 
     """
-    from scidbpy import connect
-    
-    
+    from scidbpy import connect   
     import os
-    from scidbpy import connect
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     
-    sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+    #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
     
-    print(inParams)
+    #print(inParams)
+
     theMetadata = inParams[0]
     theInstance = inParams[1]
     theRasterPath = inParams[2]
@@ -139,79 +138,27 @@ def GDALReader(inParams):
     rasterBinaryLoadPath = "%s/%s.sdbbin" % (theSciDBLoadPath, tempArray)
     
     #print(current._identity[0], SciDBInstance, rArray.shape, rasterBinaryFilePath)
-
+    start = timeit.default_timer()
     WriteMultiDimensionalArray(array, rasterBinaryFilePath)
+    stop = timeit.default_timer()
+    writeTime = stop-start
     os.chmod(rasterBinaryFilePath, 0o755)
     CreateLoadArray(sdb, tempArray, theMetadata['attribute'], rasterValueDataType)
+    start = timeit.default_timer()
     if LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryLoadPath):
+        stop = timeit.default_timer()
+        loadTime = stop-start
+        start = timeit.default_timer()
         RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
+        stop = timeit.default_timer()
+        redimensionTime = stop-start
     
     RemoveTempArray(sdb, tempArray)
     os.remove(rasterBinaryFilePath)
 
+    print("LoadedVersion %s" % (theMetadata['version']))
     del raster
-
-def AssignSciDBInstance(aProcess,theProcesses):
-    """
-    This might need to be deleted, unless people hae multiple instances they don't want to use
-    """
-    scidbInstances = [i+1 for i in range(theProcesses)]
-
-    instance = scidbInstances[scidbInstances.index(aProcess)]
-    #print(instance)
-
-    return instance
-
-
-# def RasterPrep(rasterPath, readWindow, sdbHost, destArrayName ):
-#     """
-#     This function does an initial read on the raster file and creates the necessary metadata
-#     """
-#     from osgeo import gdal
-#     from gdalconst import GA_ReadOnly
-#     from collections import OrderedDict
-    
-#     raster = gdal.Open(rasterPath, GA_ReadOnly)
-#     width = raster.RasterXSize 
-#     height  = raster.RasterYSize
-#     rArray = raster.ReadAsArray(xoff=0, yoff=0, xsize=width, ysize=1)
-#     rasterValueDataType = rArray.dtype
-
-
-
-#     NumberOfIterations = int(round( height/float(readWindow) +.5))
-
-#     rasterMetadata = OrderedDict( [(str(n), {"ReadWindow": height - n*readWindow, "Base": n*readWindow, "Width": width, "DataType": rasterValueDataType }) for n in range(NumberOfIterations)] )
-
-#     #Setting the readwindow to the default, except for the last short read
-#     for r in rasterMetadata:
-#         if rasterMetadata[r]["ReadWindow"] > readWindow: rasterMetadata[r]["ReadWindow"] = readWindow
-
-#     #rasterMetadata = orderedDict(  [(str(n): "ReadWindow": height - version_num*yWindow)]) 
-#     del raster
-#     return(rasterMetadata)
-
-
-    #python GDALtoSciDB_multiprocessing.py --processes 2 --raster /home/david/data/glc2000.tif --dest glc2000 --window 100 --chunk 10000 
-    #chunkSize = 100000
-    #chunkOverlap = 0
-    #yWindow = 100
-    #rasterArrayName = 'glc2000'
-    #rasterPath = '/home/04489/dhaynes/glc2000.tif'
-    #tempFilePath = '/home/04489/dhaynes'
-
-# def CreateDestinationArray(sdb, width, height, rasterArrayName, rasterValueDataType):
-#     """
-
-#     """
-#     try:
-#         #Create final destination array           
-#         sdb.query("create array %s <value:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, rasterValueDataType, width-1, height-1) )
-#     except:
-#         print("Found existing array with same name removing...")
-#         sdb.query("remove(%s)" % (rasterArrayName))
-#         sdb.query("create array %s <value:%s> [y=0:%s,?,0; x=0:%s,?,0]" %  (rasterArrayName, rasterValueDataType, width-1, height-1) )
-
+    return (writeTime, loadTime, redimensionTime)
 
 
 def WriteMultiDimensionalArray(rArray, binaryFilePath):
@@ -257,6 +204,9 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType
         print(query)
 
 def RemoveTempArray(sdb, tempRastName):
+    """
+    Remove the temporary array
+    """
     sdb.query("remove(%s)" % (tempRastName))
 
 def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
@@ -270,57 +220,6 @@ def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
     except:
         print("Failing on inserting data into array")
 
-#         start = timeit.default_timer()
-#         sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
-
-#         sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
-
-        
-# #         #Time the loading of binary file
-# #         start = timeit.default_timer()
-# #         binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
-#         sdb.query("load(%s,'%s', %s, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType))
-#         stop = timeit.default_timer()
-#         print(stop-start)
-
-
-#def WriteBinaryFile(rasterBinaryFileName):
-
-#     for version_num, y in enumerate(range(0, height,yWindow)):
-#         tempRastName = 'temprast_%s' % (version_num)
-#         csvPath = '%s/%s.sdbbin' % (tempOutDirectory,rasterBinaryFileName)
-#         rowsRemaining = height - version_num*yWindow
-
-#         #Start timing
-#         totalstart = timeit.default_timer()
-#         #If then statement to account for final short read
-#         if rowsRemaining >= yWindow:    
-#             rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=yWindow)
-#         else:
-#             rArray = raster.ReadAsArray(xoff=0, yoff=y, xsize=width, ysize=rowsRemaining)
-
-#         rasterValueDataType = rArray.dtype
-
-#         if version_num == 0:
-#             
-#             #pass
-        
-#         #Write the Array to Binary file
-#         start = timeit.default_timer()      
-#         aWidth, aHeight = WriteMultiDimensionalArray(rArray, csvPath)
-#         os.chmod(csvPath, 0o755)
-#         stop = timeit.default_timer()
-#         writeBinaryTime = stop-start
-                    
-#         #Create the array, which will hold the read in data. X and Y coordinates are different on purpose 
-#         sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
-        
-#         #Time the loading of binary file
-#         start = timeit.default_timer()
-#         binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
-#         sdb.query("load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType))
-#         stop = timeit.default_timer() 
-#         loadBinaryTime = stop-start
 
 def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     """
@@ -329,10 +228,13 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
     pool = mp.Pool(len(SciDBInstances))
 
     if pyVersion[0] > 2:
-        
-        pool.map_async(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
+        try:
+            result = pool.map_async(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
+        except:
+            print(multiprocessing.get_logger())
         #pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
         #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
+        print("This is: %s " % (result.get() ))
 
     else:
         pool.map_async(GDALReader, itertools.izip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses),  ( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
@@ -367,9 +269,11 @@ if __name__ == '__main__':
     pythonVersion = sys.version_info
 
     args = argument_parser().parse_args()
+    start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
     main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
-    
+    stop = timeit.default_timer()
+    print("Finished. Time to complete %s minutes" % ((stop-start)/60))
     # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath,args.OutPath, args.SciDBLoadPath, args.host):
     #     print(r)
     
