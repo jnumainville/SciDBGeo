@@ -15,6 +15,7 @@ class RasterReader(object):
 
 
     def GetMetadata(self, scidbInstances,rasterFilePath, outPath, loadPath, host):
+
         """
         Iterator for the class
         Input: 
@@ -319,15 +320,15 @@ def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
 #         stop = timeit.default_timer() 
 #         loadBinaryTime = stop-start
 
-def main(pyVersion, SciDBHost, Rasters, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
+def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     """
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
     pool = mp.Pool(len(SciDBInstances))
 
     if pyVersion[0] > 2:
-
-        pool.map_async(GDALReader, (r for r in Rasters.GetMetadata(scidbInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
+        
+        pool.map_async(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
         #pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
         #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
 
@@ -367,7 +368,7 @@ if __name__ == '__main__':
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
     main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
     
-    # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath):
+    # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath,args.OutPath, args.SciDBLoadPath, args.host):
     #     print(r)
     
 
