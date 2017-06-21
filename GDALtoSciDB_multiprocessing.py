@@ -4,26 +4,33 @@ import numpy as np
 
 class RasterReader(object):
 
-    def __init__(self, RasterPath, SciDBHost, SciDBArray, attribute, chunksize, tiles):
-        
+    def __init__(self, RasterPath, scidbHost, scidbArray, attribute, chunksize, tiles):
+        """
+        Initializethe class RasterReader
+        """
         self.width, self.height, self.datatype = self.GetRasterDimensions(RasterPath)
-        self.RasterMetadata = self.CreateArrayMetadata(self.width, self.height, chunksize, tiles)
-        #print(self.RasterMetadata)
-        #self.CreateDestinationArray(SciDBHost, SciDBArray, attribute, self.datatype, self.height, self.width, chunksize)
-
-    # def __iter__(self):
-    #     return self
+        self.RasterMetadata = self.CreateArrayMetadata(scidbArray, self.width, self.height, chunksize, tiles, attribute)
+        
+        #self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
 
 
     def GetMetadata(self, scidbInstances,rasterFilePath):
-        #numProcesses =  [1,2,3,4]
+        """
+        Iterator for the class
+        Input: 
+        scidbInstance = SciDB Instance IDs
+        rasterFilePath = Absolute Path to the GeoTiff
+        """
         for k, p , f in zip(self.RasterMetadata.keys(), itertools.cycle(scidbInstances), itertools.repeat(rasterFilePath)):
-
-            #enumerate(self.RasterMetadata.keys()):
-            #process = itertools.cycle(numProcesses)
             yield self.RasterMetadata[k], p, f
         
-            
+    def GenerateAttributesInfo(self, attribute):
+        """
+        still working on this, 
+        I want get the attributes len and compare it with value types then make a tuple
+        """
+        if len(attribute) > 1: pass
+
     
     def GetRasterDimensions(self, thePath):
         """
@@ -42,12 +49,12 @@ class RasterReader(object):
 
         return width, height, rasterValueDataType
 
-    def CreateDestinationArray(self, sdbHost, rasterArrayName, attribute, rasterValueDataType, height, width, chunk):
+    def CreateDestinationArray(self, theURL, rasterArrayName, attribute, rasterValueDataType, height, width, chunk):
         """
         Function creates the final destination array
         """
         from scidbpy import connect
-        sdb = connect(sdbHost)
+        sdb = connect(theURL)
         
         try:           
             sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
@@ -56,11 +63,10 @@ class RasterReader(object):
             sdb.query("remove(%s)" % (rasterArrayName))
             sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
 
-        
         del sdb 
 
 
-    def CreateArrayMetadata(self, width, height, chunk=1000, tiles=1):
+    def CreateArrayMetadata(self, theArray, width, height, chunk=1000, tiles=1, attribute='value'):
         """
         This function gathers all the metadata necessary
         The loops are 
@@ -84,7 +90,8 @@ class RasterReader(object):
                 if columnsRemaining > chunk*tiles : columnsRemaining = chunk*tiles
 
                 #print(rowsRemaining, columnsRemaining, version_num, x_version,y_version,)
-                RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet), ("yOffSet",yOffSet), ("xWindow", columnsRemaining), ("yWindow", rowsRemaining), ("version", version_num) ])
+                RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet), ("yOffSet",yOffSet), \
+                    ("xWindow", columnsRemaining), ("yWindow", rowsRemaining), ("version", version_num), ("attribute", attribute), ("scidbArray", theArray)])
             
             rowMax += math.ceil(width/(chunk*tiles))
 
@@ -106,7 +113,7 @@ def GDALReader(inParams):
     
     #print(inParams)
     theMetadata = inParams[0]
-    theSciDBInstance = inParams[1]
+    theInstance = inParams[1]
     thePath = inParams[2]
     
     print(theMetadata, theSciDBInstance, thePath)
@@ -119,17 +126,18 @@ def GDALReader(inParams):
 
     raster = gdal.Open(thePath, GA_ReadOnly)
     array = raster.ReadAsArray(xoff=theMetadata['xOffSet'], yoff=theMetadata['yOffSet'], xsize=theMetadata['xWindow'], ysize=theMetadata['yWindow'])
-    
-    rasterBinaryFileName = "temprast_%s" % (theMetadata['version'])
-    
-    print(array.shape, os.getpid())
+    rasterValueDataType = array.dtype
+
+    tempArray = "temprast_%s" % (theMetadata['version'])
     basePath = "/".join(thePath.split("/")[:-1])
-    rasterBinaryFilePath = "%s/%s.sdbbin" % (basePath, rasterBinaryFileName)
+    rasterBinaryFilePath = "%s/%s.sdbbin" % (basePath, tempArray)
     
     #print(current._identity[0], SciDBInstance, rArray.shape, rasterBinaryFilePath)
 
-    WriteMultiDimensionalArray(array, rasterBinaryFilePath)
-    #LoadOneDimensionalArray(sdb, SciDBInstance, tempRastName, rasterValueDataType, rasterBinaryFilePath)    
+    #WriteMultiDimensionalArray(array, rasterBinaryFilePath)
+    #CreateLoadArray(sdb, rasterBinaryFileName, theMetadata['attribute'], rasterValueDataType)
+    #LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryFilePath)
+    #RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
 
     del raster
 
@@ -216,21 +224,51 @@ def WriteMultiDimensionalArray(rArray, binaryFilePath):
         bytesTile = b"".join(byteValues)
         fileout.write(bytesTile)
 
-def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType, binaryLoadPath):
-    try:
-        start = timeit.default_timer()
-        sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+def CreateLoadArray(sdb, tempRastName, attribute_name, rasterValueDataType):
+    """
+    Create the loading 1D array
+    """
+    try: 
+        sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name, rasterValueDataType) )
+    except:
+        #Silently deleting temp arrays
+        sdb.query("remove(%s)" % (tempRastName))
+        sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name,rasterValueDataType) )    
 
-        sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
-        
-#         #Time the loading of binary file
-#         start = timeit.default_timer()
-#         binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
+def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType, binaryLoadPath):
+    """
+    Function for loading GDAL data into a single dimension
+    """
+    try:
         sdb.query("load(%s,'%s', %s, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType))
-        stop = timeit.default_timer()
-        print(stop-start)
     except:
         print("Error Loading DimensionalArray")
+
+
+def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
+    """
+    Function for redimension and inserting data from the temporary array into the destination array
+    """
+    try:
+        #sdb.query("insert(redimension(apply( {A}, y, y1+{yOffSet}, x, x1+{xOffSet} ), {B} ), {B})",A=tempRastName, B=rasterArrayName, yOffSet=RasterMetadata[k]["yOffSet"], xOffSet=RasterMetadata[k]["xOffSet"])    
+        query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s ), %s ), %s" % (tempArray, yOffSet, xOffSet, ScidbArray, scidbArray)
+        sdb.query(query)
+    except:
+        print("Failing on inserting data into array")
+
+#         start = timeit.default_timer()
+#         sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+
+#         sdb.query("create array %s <x1:int64, y1:int64, value:%s> [xy=0:*,?,?]" % (tempRastName, rasterValueDataType) )
+
+        
+# #         #Time the loading of binary file
+# #         start = timeit.default_timer()
+# #         binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
+#         sdb.query("load(%s,'%s', %s, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType))
+#         stop = timeit.default_timer()
+#         print(stop-start)
+
 
 #def WriteBinaryFile(rasterBinaryFileName):
 
