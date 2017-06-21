@@ -11,7 +11,7 @@ class RasterReader(object):
         self.width, self.height, self.datatype = self.GetRasterDimensions(RasterPath)
         self.RasterMetadata = self.CreateArrayMetadata(scidbArray, self.width, self.height, chunksize, tiles, attribute)
         
-        #self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
+        self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
 
 
     def GetMetadata(self, scidbInstances,rasterFilePath):
@@ -103,11 +103,11 @@ def GDALReader(inParams):
     """
 
     """
-
-    #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+    from scidbpy import connect
+    sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
     
     import os
-    from scidbpy import connect
+    #from scidbpy import connect
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     
@@ -116,7 +116,7 @@ def GDALReader(inParams):
     theInstance = inParams[1]
     thePath = inParams[2]
     
-    print(theMetadata, theSciDBInstance, thePath)
+    print(theMetadata, theInstance, thePath)
     
     # # yWindow, base, width, datatype, n = inParams[2]
     # # #print("multiprocessing")
@@ -134,10 +134,10 @@ def GDALReader(inParams):
     
     #print(current._identity[0], SciDBInstance, rArray.shape, rasterBinaryFilePath)
 
-    #WriteMultiDimensionalArray(array, rasterBinaryFilePath)
-    #CreateLoadArray(sdb, rasterBinaryFileName, theMetadata['attribute'], rasterValueDataType)
-    #LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryFilePath)
-    #RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
+    WriteMultiDimensionalArray(array, rasterBinaryFilePath)
+    CreateLoadArray(sdb, tempArray, theMetadata['attribute'], rasterValueDataType)
+    if LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryFilePath):
+        RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
 
     del raster
 
@@ -240,9 +240,12 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType
     Function for loading GDAL data into a single dimension
     """
     try:
-        sdb.query("load(%s,'%s', %s, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType))
+        query = "load(%s,%s,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType)
+        sdb.query(query)
     except:
         print("Error Loading DimensionalArray")
+        print(query)
+
 
 
 def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
