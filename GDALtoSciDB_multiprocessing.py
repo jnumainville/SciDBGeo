@@ -11,18 +11,18 @@ class RasterReader(object):
         self.width, self.height, self.datatype = self.GetRasterDimensions(RasterPath)
         self.RasterMetadata = self.CreateArrayMetadata(scidbArray, self.width, self.height, chunksize, tiles, attribute)
         
-        self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
+        #self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
 
 
-    def GetMetadata(self, scidbInstances,rasterFilePath):
+    def GetMetadata(self, scidbInstances,rasterFilePath, outPath, loadPath):
         """
         Iterator for the class
         Input: 
         scidbInstance = SciDB Instance IDs
         rasterFilePath = Absolute Path to the GeoTiff
         """
-        for k, p , f in zip(self.RasterMetadata.keys(), itertools.cycle(scidbInstances), itertools.repeat(rasterFilePath)):
-            yield self.RasterMetadata[k], p, f
+        for key, process, filepath, outDirectory, loadDirectory in zip(self.RasterMetadata.keys(), itertools.cycle(scidbInstances), itertools.repeat(rasterFilePath), itertools.repeat(outPath), itertools.repeat(loadPath)):
+            yield self.RasterMetadata[key], process, filepath, outDirectory, loadDirectory
         
     def GenerateAttributesInfo(self, attribute):
         """
@@ -104,19 +104,22 @@ def GDALReader(inParams):
 
     """
     from scidbpy import connect
-    sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+    #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
     
     import os
     #from scidbpy import connect
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     
-    #print(inParams)
+    print(inParams)
     theMetadata = inParams[0]
     theInstance = inParams[1]
-    thePath = inParams[2]
-    
-    print(theMetadata, theInstance, thePath)
+    theRasterPath = inParams[2]
+    theSciDBOutPath = inParams[3]
+    theSciDBLoadPath = inParams[4]
+
+
+    #print(theMetadata, theInstance, thePath)
     
     # # yWindow, base, width, datatype, n = inParams[2]
     # # #print("multiprocessing")
@@ -124,13 +127,12 @@ def GDALReader(inParams):
     # # current = mp.current_process()
     # # SciDBInstance = AssignSciDBInstance(current._identity[0], numProcesses )
 
-    raster = gdal.Open(thePath, GA_ReadOnly)
+    raster = gdal.Open(theRasterPath, GA_ReadOnly)
     array = raster.ReadAsArray(xoff=theMetadata['xOffSet'], yoff=theMetadata['yOffSet'], xsize=theMetadata['xWindow'], ysize=theMetadata['yWindow'])
     rasterValueDataType = array.dtype
 
     tempArray = "temprast_%s" % (theMetadata['version'])
-    basePath = "/".join(thePath.split("/")[:-1])
-    rasterBinaryFilePath = "%s/%s.sdbbin" % (basePath, tempArray)
+    rasterBinaryFilePath = "%s/%s.sdbbin" % (theSciDBLoadPath, tempArray)
     
     #print(current._identity[0], SciDBInstance, rArray.shape, rasterBinaryFilePath)
 
@@ -240,7 +242,7 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType
     Function for loading GDAL data into a single dimension
     """
     try:
-        query = "load(%s,%s,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType)
+        query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType)
         sdb.query(query)
     except:
         print("Error Loading DimensionalArray")
@@ -311,7 +313,7 @@ def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
 #         stop = timeit.default_timer() 
 #         loadBinaryTime = stop-start
 
-def main(pyVersion, Rasters, scidbInstances, rasterFilePath):
+def main(pyVersion, Rasters, scidbInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     """
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
@@ -319,7 +321,7 @@ def main(pyVersion, Rasters, scidbInstances, rasterFilePath):
 
     if pyVersion[0] > 2:
 
-        pool.map(GDALReader, (r for r in Rasters.GetMetadata(scidbInstances, rasterFilePath)  ))
+        pool.map_async(GDALReader, (r for r in Rasters.GetMetadata(scidbInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath)  ))
         #pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
         #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
 
@@ -357,7 +359,7 @@ if __name__ == '__main__':
 
     args = argument_parser().parse_args()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
-    main(pythonVersion, RasterInformation, args.instances, args.rasterPath)
+    main(pythonVersion, RasterInformation, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
     
     # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath):
     #     print(r)
