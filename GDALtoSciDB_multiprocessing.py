@@ -113,7 +113,7 @@ def GDALReader(inParams):
     
     #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
     
-    print(inParams)
+    #print(inParams)
 
     theMetadata = inParams[0]
     theInstance = inParams[1]
@@ -231,9 +231,11 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType
     try:
         query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, rasterValueDataType)
         sdb.query(query)
+        return 1
     except:
         print("Error Loading DimensionalArray")
         print(query)
+        return 0
 
 def RemoveTempArray(sdb, tempRastName):
     """
