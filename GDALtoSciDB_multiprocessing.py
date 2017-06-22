@@ -159,6 +159,7 @@ def GDALReader(inParams):
     os.remove(rasterBinaryFilePath)
 
     print("LoadedVersion %s" % (theMetadata['version']))
+    if theMetadata['version'] == 0: print("Estimated time for loading is %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ("Unknown", writeTime, loadTime, redimensionTime))
     del raster
     return (writeTime, loadTime, redimensionTime)
 
@@ -182,6 +183,29 @@ def WriteMultiDimensionalArray(rArray, binaryFilePath):
 
         bytesTile = b"".join(byteValues)
         fileout.write(bytesTile)
+
+def WriteArray(theArray, csvPath):
+    """
+    This function uses numpy tricks to write a numpy array in binary format with indices 
+    """
+    col, row = theArray.shape
+    with open(csvPath, 'wb') as fileout:
+
+        thecolumns =[y for y in range(col)]
+        column_index = np.array(np.repeat(thecolumns, row), dtype=np.dtype('int64'))
+        
+        therows = [x for x in range(row)]
+        allrows = [therows for i in range(col)]
+        row_index = np.array(np.concatenate(allrows), dtype=np.dtype('int64'))
+
+        values = theArray.ravel()
+        vdatatype = theArray.dtype
+
+        arraydatypes = 'int64, int64, %s' % (vdatatype)
+        dataset = np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatypes)
+        #dataset = np.array(np.vstack((column_index, rows_index, values))
+        #print(dataset.dtype)
+        fileout.write(dataset.ravel().tobytes())
 
 def CreateLoadArray(sdb, tempRastName, attribute_name, rasterValueDataType):
     """
