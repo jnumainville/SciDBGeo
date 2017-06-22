@@ -253,6 +253,7 @@ def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
         sdb.query(query)
     except:
         print("Failing on inserting data into array")
+        print(query)
 
 
 def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
