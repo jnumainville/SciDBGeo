@@ -154,14 +154,20 @@ def GDALReader(inParams):
         RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
         stop = timeit.default_timer()
         redimensionTime = stop-start
+        RemoveTempArray(sdb, tempArray)
+        print("LoadedVersion %s" % (theMetadata['version']))
+        if theMetadata['version'] == 0: print("Estimated time for loading is %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ("Unknown", writeTime, loadTime, redimensionTime))
+        return (writeTime, loadTime, redimensionTime)
     
-    RemoveTempArray(sdb, tempArray)
-    os.remove(rasterBinaryFilePath)
+    else:
+        print("Error Loading")
+        os.remove(rasterBinaryFilePath)
+        return (-999, -999, -999)
 
-    print("LoadedVersion %s" % (theMetadata['version']))
-    if theMetadata['version'] == 0: print("Estimated time for loading is %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ("Unknown", writeTime, loadTime, redimensionTime))
+    
+    
     del raster
-    return (writeTime, loadTime, redimensionTime)
+    
 
 
 def WriteMultiDimensionalArray(rArray, binaryFilePath):
