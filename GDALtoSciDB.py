@@ -204,9 +204,6 @@ def WriteArray(theArray, csvPath):
         #fileout.write(dataset.ravel(order='F').tostring())
 
 
-
-    return 
-
 def WriteMultiDimensionalArray(rArray, csvPath ):
     '''This function write the multidimensional array as a binary '''
     with open(csvPath, 'wb') as fileout:
