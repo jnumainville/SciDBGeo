@@ -102,6 +102,7 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, tempOutDirectory, tempSciDBLo
         totalstart = timeit.default_timer()
         tempRastName = 'temprast_%s' % (scidbVersion)
         csvPath = '%s/%s.sdbbin' % (tempOutDirectory,tempRastName)
+        csvPath2 = '%s/%s_2.sdbbin' % (tempOutDirectory,tempRastName)
         rArray = raster.ReadAsArray(xoff=RasterMetadata[k]["xOffSet"], yoff=RasterMetadata[k]["yOffSet"], xsize=RasterMetadata[k]["xWindow"], ysize=RasterMetadata[k]["yWindow"])
         
              
@@ -130,18 +131,26 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, tempOutDirectory, tempSciDBLo
         if scidbVersion == 0: CreateDestinationArray(sdb, rasterArrayName, attribute, rasterValueDataType, height, width, chunk)     
 
         #Write the Array to Binary file, data is written out Column/Y, Row/X, Value
-        start = timeit.default_timer()      
-        aWidth, aHeight = WriteMultiDimensionalArray(rArray, csvPath)
-        os.chmod(csvPath, 0o755)
+        # start = timeit.default_timer()      
+        # aWidth, aHeight = WriteMultiDimensionalArray(rArray, csvPath2)
+        # os.chmod(csvPath2, 0o755)
+        # stop = timeit.default_timer()
+        # writeBinaryTime = stop-start
+        
+        start = timeit.default_timer()
+        WriteArray(rArray, csvPath)
         stop = timeit.default_timer()
         writeBinaryTime = stop-start
-                        
+        os.chmod(csvPath, 0o755)
+
+        #print("Time numpy iterator: %s, Time for Numpy tricks: %s" % (writeBinaryTime, writeDataTime))
         #Create the array, which will hold the read in data. Y/Column and X/Row coordinates are different on purpose
         CreateLoadArray(sdb, tempRastName, attribute, rasterValueDataType)
 
         #Time the loading of binary file
         start = timeit.default_timer()
         binaryLoadPath = '%s/%s.sdbbin' % (tempSciDBLoad,tempRastName )
+        #sdb.query("load(%s,'%s', -2, '(int64, int64, int64)' )" % (tempRastName, binaryLoadPath))
         sdb.query("load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType))
         stop = timeit.default_timer() 
         loadBinaryTime = stop-start
@@ -170,6 +179,33 @@ def ReadGDALFile(sdb, rasterArrayName, rasterPath, tempOutDirectory, tempSciDBLo
             CleanUpTemp(sdb, rasterArrayName, scidbVersion, csvPath, tempRastName)
 # #        if scidbVersion >= 300 : break
 #         rowMax += x_version+1
+
+def WriteArray(theArray, csvPath):
+    """
+
+    """
+    col, row = theArray.shape
+    with open(csvPath, 'wb') as fileout:
+
+        thecolumns =[y for y in range(col)]
+        column_index = np.array(np.repeat(thecolumns, row), dtype=np.dtype('int64'))
+        
+        therows = [x for x in range(row)]
+        allrows = [therows for i in range(col)]
+        row_index = np.array(np.concatenate(allrows), dtype=np.dtype('int64'))
+
+        values = theArray.ravel()
+        vdatatype = theArray.dtype
+    
+        dataset = np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype='int64, int64, uint8')
+        #dataset = np.array(np.vstack((column_index, rows_index, values))
+        #print(dataset.dtype)
+        fileout.write(dataset.ravel().tobytes())
+        #fileout.write(dataset.ravel(order='F').tostring())
+
+
+
+    return 
 
 def WriteMultiDimensionalArray(rArray, csvPath ):
     '''This function write the multidimensional array as a binary '''
@@ -223,6 +259,7 @@ def argument_parser():
 if __name__ == '__main__':
     args = argument_parser().parse_args()
     if os.path.exists(args.Raster):
+        #if args.Host = 'localhost'
         sdb = connect(args.Host)
         #tempFileOutPath = '/mnt'
         #tempFileSciDBLoadPath = '/data/04489/dhaynes'
