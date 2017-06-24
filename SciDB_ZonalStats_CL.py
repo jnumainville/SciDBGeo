@@ -248,11 +248,11 @@ def SubArray_SummaryStats(sdb, polygonSciDBArrayName, SciDBArray, minX, minY, ma
     return queryTime
 
 
-def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, statsMode=1, filePath=None, verbose=False):
+def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, hostURL, statsMode=1, filePath=None, verbose=False):
     "This function conducts zonal stats in SciDB"
     
     outDictionary = OrderedDict()
-    sdb = scidbpy.connect()
+    sdb = scidbpy.connect(hostURL)
 
     for t in range(NumberofTests):
         theTest = "test_%s" % (t+1)
@@ -339,13 +339,13 @@ def argument_parser():
     parser.add_argument('-Mode', help="This allows you to choose the mode of analysis you want to conduct", type=int, default=1, required=True, dest='mode')
     parser.add_argument('-CSV', required=False, dest='CSV')
     parser.add_argument('-v', required=False, action="store_true", default=False, dest='verbose')
-    
+    parser.add_argument('-Host', required=False, help="SciDB host for connection", dest="host", default="http://localhost:8080")        
     return parser
 
 if __name__ == '__main__':
     args = argument_parser().parse_args()
     if CheckFiles(args.Shapefile, args.Raster):
-        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, args.mode, args.CSV, args.verbose)
+        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, args.host, args.mode, args.CSV, args.verbose)
     else:
         print(args.Shapefile, args.Raster)
 

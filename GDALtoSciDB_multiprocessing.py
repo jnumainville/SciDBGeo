@@ -243,13 +243,13 @@ def RemoveTempArray(sdb, tempRastName):
     """
     sdb.query("remove(%s)" % (tempRastName))
 
-def RedimensionAndInsertArray(sdb, tempArray, scidbArray, xOffSet, yOffSet):
+def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, xOffSet, yOffSet):
     """
     Function for redimension and inserting data from the temporary array into the destination array
     """
     try:
         #sdb.query("insert(redimension(apply( {A}, y, y1+{yOffSet}, x, x1+{xOffSet} ), {B} ), {B})",A=tempRastName, B=rasterArrayName, yOffSet=RasterMetadata[k]["yOffSet"], xOffSet=RasterMetadata[k]["xOffSet"])    
-        query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s ), %s ), %s" % (tempArray, yOffSet, xOffSet, ScidbArray, scidbArray)
+        query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
         sdb.query(query)
     except:
         print("Failing on inserting data into array")
