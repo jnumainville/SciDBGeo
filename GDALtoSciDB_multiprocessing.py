@@ -309,11 +309,11 @@ if __name__ == '__main__':
     args = argument_parser().parse_args()
     start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
-    # main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
+    main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
     stop = timeit.default_timer()
     print("Finished. Time to complete %s minutes" % ((stop-start)/60))
-    for r in RasterInformation.GetMetadata(args.instances, args.rasterPath,args.OutPath, args.SciDBLoadPath, args.host):
-        print(r)
+    # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath,args.OutPath, args.SciDBLoadPath, args.host):
+    #     print(r)
     
 
     #RasterPath, SciDBHost, SciDBArray, attribute, chunksize, tiles
