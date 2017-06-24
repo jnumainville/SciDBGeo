@@ -160,8 +160,8 @@ def GDALReader(inParams):
         redimensionTime = stop-start
         RemoveTempArray(sdb, tempArray)
         print("LoadedVersion %s" % (theMetadata['version']))
-        dataLoadingTime = writeTime + loadTime + redimensionTime
-        if theMetadata['version'] == 0: print("Estimated time for loading is %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % (theMetadata["Loops"] * dataLoadingTime, writeTime, loadTime, redimensionTime))
+        dataLoadingTime = (writeTime + loadTime + redimensionTime) * theMetadata["Loops"] / 60 
+        if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
         if theMetadata['version'] > 0: sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
         return (writeTime, loadTime, redimensionTime)
     
@@ -169,12 +169,9 @@ def GDALReader(inParams):
         print("Error Loading")
         os.remove(rasterBinaryFilePath)
         return (-999, -999, -999)
-
-    
     
     del raster
     
-
 
 def WriteMultiDimensionalArray(rArray, binaryFilePath):
     """
