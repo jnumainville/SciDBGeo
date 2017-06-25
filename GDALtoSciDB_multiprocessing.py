@@ -145,12 +145,16 @@ def GDALReader(inParams):
     
     #print(current._identity[0], SciDBInstance, rArray.shape, rasterBinaryFilePath)
     start = timeit.default_timer()
-    WriteMultiDimensionalArray(array, rasterBinaryFilePath)
+    ## WriteMultiDimensionalArray(array, rasterBinaryFilePath)
+    WriteArray(array, rasterBinaryFilePath)
     stop = timeit.default_timer()
+
+    # print(theMetadata['version'] )
     writeTime = stop-start
     os.chmod(rasterBinaryFilePath, 0o755)
     CreateLoadArray(sdb, tempArray, theMetadata['attribute'], rasterValueDataType)
     start = timeit.default_timer()
+
     if LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryLoadPath):
         stop = timeit.default_timer()
         loadTime = stop-start
@@ -159,16 +163,15 @@ def GDALReader(inParams):
         stop = timeit.default_timer()
         redimensionTime = stop-start
         RemoveTempArray(sdb, tempArray)
-        print("LoadedVersion %s" % (theMetadata['version']))
+        print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"]))
         dataLoadingTime = (writeTime + loadTime + redimensionTime) * theMetadata["Loops"] / 60 
         if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
         if theMetadata['version'] > 0: sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
-        return (writeTime, loadTime, redimensionTime)
-    
+        return (theMetadata['version'], writeTime, loadTime, redimensionTime)
     else:
         print("Error Loading")
         os.remove(rasterBinaryFilePath)
-        return (-999, -999, -999)
+        return (theMetadata['version'], -999, -999, -999)
     
     del raster
     
@@ -267,12 +270,14 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
 
     if pyVersion[0] > 2:
         try:
-            result = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
+            results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
         except:
             print(multiprocessing.get_logger())
         #pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
         #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
-        print("This is: %s " % (result.get() ))
+
+        timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2], "redimensionTime": i[3] } for i in results}
+        print(timeDictionary)
 
     else:
         pool.map_async(GDALReader, itertools.izip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses),  ( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
