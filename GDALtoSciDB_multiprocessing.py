@@ -219,6 +219,21 @@ def WriteArray(theArray, csvPath):
         #print(dataset.dtype)
         fileout.write(dataset.ravel().tobytes())
 
+def WriteFile(filePath, theDictionary):
+    """
+    This function writes out the dictionary as csv
+    """
+    
+    thekeys = list(theDictionary.keys())
+    
+    with open(filePath, 'w') as csvFile:
+        fields = list(theDictionary[thekeys[0]].keys())
+        theWriter = csv.DictWriter(csvFile, fieldnames=fields)
+        theWriter.writeheader()
+
+        for k in theDictionary.keys():
+            theWriter.writerow(theDictionary[k])
+
 def CreateLoadArray(sdb, tempRastName, attribute_name, rasterValueDataType):
     """
     Create the loading 1D array
@@ -262,7 +277,7 @@ def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, xOffSet, yOffSet):
         print(query)
 
 
-def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
+def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, csvPath=None):
     """
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
@@ -277,7 +292,9 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
         #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
 
         timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2], "redimensionTime": i[3] } for i in results}
-        print(timeDictionary)
+
+        if csvPath:
+            WriteFile(csvPath, timeDictionary)
 
     else:
         pool.map_async(GDALReader, itertools.izip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses),  ( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
@@ -301,8 +318,10 @@ def argument_parser():
     parser.add_argument("-Tiles", required =False, type=int, help="Size in rows of the read window, default: 1", dest="tiles", default=1)
     parser.add_argument("-Chunk", required =False, type=int, help="Chunk size for the destination array, default: 1,000", dest="chunk", default=1000)
     parser.add_argument("-Overlap", required =False, type=int, help="Chunk overlap size. Adding overlap increases data loading time. defalt: 0", dest="overlap", default=0)
-    parser.add_argument('-TempOut', required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath',)
-    parser.add_argument('-SciDBLoadPath', required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
+    parser.add_argument("-TempOut", required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath',)
+    parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
+    parser.add_argument("-CSV", required =False, help="Create CSV file", dest="csv", default="None")
+
     
     return parser
 
@@ -314,7 +333,7 @@ if __name__ == '__main__':
     args = argument_parser().parse_args()
     start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
-    main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
+    main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath, args.csv)
     stop = timeit.default_timer()
     print("Finished. Time to complete %s minutes" % ((stop-start)/60))
     # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath,args.OutPath, args.SciDBLoadPath, args.host):
