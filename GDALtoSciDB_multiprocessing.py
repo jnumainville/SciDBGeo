@@ -311,9 +311,9 @@ def argument_parser():
 
     parser = argparse.ArgumentParser(description= "multiprocessing module for loading GDAL read data into SciDB with multiple instances")    
     parser.add_argument("-Instances", required =True, nargs='*', type=int, help="Number of SciDB Instances for parallel data loading", dest="instances")    
-    parser.add_argument("-Host", required =True, help="SciDB host for connection", dest="host", default="localhost")    
+    parser.add_argument("-Host", required =False, help="SciDB host for connection", dest="host", default="http://localhost:8080")    
     parser.add_argument("-RasterPath", required =True, help="Input file path for the raster", dest="rasterPath")    
-    parser.add_argument("-ScidbArray", required =True, help="Name of the destination array", dest="rasterName")
+    parser.add_argument("-SciDBArray", required =True, help="Name of the destination array", dest="SciArray")
     parser.add_argument("-AttributeNames", required =True, help="Name of the destination array", dest="attributes", default="value")
     parser.add_argument("-Tiles", required =False, type=int, help="Size in rows of the read window, default: 1", dest="tiles", default=1)
     parser.add_argument("-Chunk", required =False, type=int, help="Chunk size for the destination array, default: 1,000", dest="chunk", default=1000)
@@ -321,7 +321,6 @@ def argument_parser():
     parser.add_argument("-TempOut", required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath',)
     parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
     parser.add_argument("-CSV", required =False, help="Create CSV file", dest="csv", default="None")
-
     
     return parser
 

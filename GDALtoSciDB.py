@@ -230,17 +230,37 @@ def CleanUpTemp(sdb, rasterArrayName, version_num, csvPath, tempRastName):
     sdb.query("remove(%s)" % (tempRastName))
     os.remove(csvPath)
 
+# def argument_parser():
+#     parser = argparse.ArgumentParser(description="Load GDAL dataset into SciDB")   
+#     parser.add_argument('-SciDBArray', required=True, dest='SciArray')
+#     parser.add_argument('-RasterPath', required=True, dest='Raster')
+#     parser.add_argument('-Host', required=False, default=None, dest='Host')
+#     parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=1000)
+#     parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
+#     parser.add_argument('-Tiles', required=False, dest='Tiles', type=int, default=5)
+#     parser.add_argument('-att_name', required=False, dest='Attributes', default="value")
+#     parser.add_argument('-tempOut', required=False, dest='OutPath', default='/home/scidb/scidb_data/0/0')
+#     parser.add_argument('-SciDBLoad', required=False, dest='SciDBLoadPath', default='/home/scidb/scidb_data/0/0')
+    
+#     return parser
+
 def argument_parser():
-    parser = argparse.ArgumentParser(description="Load GDAL dataset into SciDB")   
-    parser.add_argument('-SciDBArray', required=True, dest='SciArray')
-    parser.add_argument('-RasterPath', required=True, dest='Raster')
-    parser.add_argument('-Host', required=False, default=None, dest='Host')
-    parser.add_argument('-Chunksize', required=False, dest='Chunk', type=int, default=1000)
-    parser.add_argument('-Overlap', required=False, dest='Overlap', type=int, default=0)
-    parser.add_argument('-Tiles', required=False, dest='Tiles', type=int, default=5)
-    parser.add_argument('-att_name', required=False, dest='Attributes', default="value")
-    parser.add_argument('-tempOut', required=False, dest='OutPath', default='/home/scidb/scidb_data/0/0')
-    parser.add_argument('-SciDBLoad', required=False, dest='SciDBLoadPath', default='/home/scidb/scidb_data/0/0')
+    """
+    Parse arguments and return Arguments
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description= "Load GDAL dataset into SciDB")
+    parser.add_argument("-Host", required =False, help="SciDB host for connection", dest="host", default="http://localhost:8080")    
+    parser.add_argument("-RasterPath", required =True, help="Input file path for the raster", dest="rasterPath")    
+    parser.add_argument("-SciDBArray", required =True, help="Name of the destination array", dest="SciArray")
+    parser.add_argument("-AttributeNames", required =True, help="Name of the destination array", dest="attributes", default="value")
+    parser.add_argument("-Tiles", required =False, type=int, help="Size in rows of the read window, default: 1", dest="tiles", default=1)
+    parser.add_argument("-Chunk", required =False, type=int, help="Chunk size for the destination array, default: 1,000", dest="chunk", default=1000)
+    parser.add_argument("-Overlap", required =False, type=int, help="Chunk overlap size. Adding overlap increases data loading time. defalt: 0", dest="overlap", default=0)
+    parser.add_argument("-TempOut", required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath',)
+    parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
+    parser.add_argument("-CSV", required =False, help="Create CSV file", dest="csv", default="None")
     
     return parser
 
@@ -255,14 +275,14 @@ def argument_parser():
 
 if __name__ == '__main__':
     args = argument_parser().parse_args()
-    if os.path.exists(args.Raster):
+    if os.path.exists(args.rasterPath):
         #if args.Host = 'localhost'
-        sdb = connect(args.Host)
+        sdb = connect(args.host)
         #tempFileOutPath = '/mnt'
         #tempFileSciDBLoadPath = '/data/04489/dhaynes'
         if sdb:
             #tempFileSciDBLoadPath = tempFileOutPath = '/home/scidb/scidb_data/0/0'
-            ReadGDALFile(sdb, args.SciArray, args.Raster, args.OutPath, args.SciDBLoadPath, args.Attributes, args.Chunk, args.Tiles, args.Overlap)
+            ReadGDALFile(sdb, args.SciArray, args.rasterPath, args.OutPath, args.SciDBLoadPath, args.attributes, args.chunk, args.tiles, args.overlap)
         else:
             print('Not Valid connection: %s' % (args.Host))
     else:
