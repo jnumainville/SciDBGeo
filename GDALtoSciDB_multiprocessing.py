@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import itertools, timeit
 import numpy as np
-import math
+import math, csv
 
 class RasterReader(object):
 
@@ -164,9 +164,9 @@ def GDALReader(inParams):
         redimensionTime = stop-start
         RemoveTempArray(sdb, tempArray)
         print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"]))
-        dataLoadingTime = (writeTime + loadTime + redimensionTime) * theMetadata["Loops"] / 60 
+        dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
         if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
-        if theMetadata['version'] > 0: sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
+        # if theMetadata['version'] > 0: sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
         return (theMetadata['version'], writeTime, loadTime, redimensionTime)
     else:
         print("Error Loading")
@@ -322,7 +322,6 @@ def argument_parser():
     parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
     parser.add_argument("-CSV", required =False, help="Create CSV file", dest="csv", default="None")
 
-    
     return parser
 
 
