@@ -102,12 +102,11 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
         sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
         sdb.query(sdbquery)
     except:
+        print(sdbquery)
         sdb.query("remove(%s)" % tempArray)
         sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
         sdb.query(sdbquery)
 
-    #binaryLoadPath = "%s/%s.scidb" % (tempSciDBLoad, tempRastName)
-    #LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
     
     #Write the array in the correct location
     start = timeit.default_timer()
@@ -249,7 +248,7 @@ def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, te
 
     """
     binaryLoadPath = "%s/%s.scidb" % (tempSciDBLoad, tempRastName)
-    binaryLoadPath, loadTime = LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, binaryLoadPath, rasterValueDataType, 'y', 'x', verbose, -1)
+    binaryLoadPath, loadTime = LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, 'y', 'x', verbose, -1)
     
     start = timeit.default_timer()
     sdbquery = "grouped_aggregate(equi_join(between(%s, %s, %s, %s, %s), %s, 'left_names=x,y', 'right_names=x,y', 'algorithm=hash_replicate_right'), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, minY, minX, maxY, maxX, tempRastName) 
@@ -338,7 +337,11 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, hostURL, sta
             WriteMultiDimensionalArray(rasterizedArray, csvPath)
             tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
             tempRastName = csvPath.split('/')[-1].split('.')[0]
-            transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad, tempRastName, ulY, ulX, lrY, lrX, verbose)
+
+            binaryLoadPath = "%s/%s.scidb" % (tempSciDBLoad, tempRastName)
+            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
+
+            transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, binaryLoadPath, tempRastName, ulY, ulX, lrY, lrX, verbose)
 
         elif statsMode == 4:
             binaryPath = '/home/scidb/scidb_data/0'
