@@ -10,6 +10,7 @@ A command line tool for conducting Zonal Statistics in SciDB
 from osgeo import ogr, gdal
 import scidbpy, timeit, csv, argparse, os, re
 from collections import OrderedDict
+import numpy as np
 
 def world2Pixel(geoMatrix, x, y):
     """
@@ -105,7 +106,8 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
         sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
         sdb.query(sdbquery)
 
-    LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, "y1", "x1", verbose)
+    #binaryLoadPath = "%s/%s.scidb" % (tempSciDBLoad, tempRastName)
+    #LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
     
     #Write the array in the correct location
     start = timeit.default_timer()
@@ -124,6 +126,32 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     if verbose: print(sdbquery, queryTime)
 
     return insertTime, queryTime
+
+def ArrayToBinary(theArray):
+    """
+    Use Numpy tricks to write a numpy array in binary format with indices 
+
+    input: Numpy 2D array
+    output: Numpy 2D array in binary format
+    """
+    col, row = theArray.shape
+    
+    thecolumns =[y for y in range(col)]
+    column_index = np.array(np.repeat(thecolumns, row), dtype=np.dtype('int64'))
+    
+    therows = [x for x in range(row)]
+    allrows = [therows for i in range(col)]
+    row_index = np.array(np.concatenate(allrows), dtype=np.dtype('int64'))
+
+    values = theArray.ravel()
+    vdatatype = theArray.dtype
+
+    arraydatatypes = 'int64, int64, %s' % (vdatatype)
+    dataset = np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatatypes)
+
+    return dataset
+    #return dataset.ravel().tobytes()
+        
     
 
 def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0 ):
@@ -175,7 +203,7 @@ def QueryResults():
     #query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), f0)" % (polygonSciDBArray.name, SciDBArray, ulY, ulX, lrY, lrX)
 
 
-def LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, dim1="y", dim2="x", verbose=False):
+def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim1="y", dim2="x", verbose=False, loadMode=-2):
     """
     Function Loads 1D array data into sciDB
     in : 
@@ -192,7 +220,7 @@ def LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, dim1
     #chunksize = int(input("Please input chunksize: "))
     #if isinstance(chunksize, int):
 
-    binaryLoadPath = '%s/%s.scidb' % (tempSciDBLoad,tempRastName )
+    #binaryLoadPath = '%s/%s.scidb' % (tempSciDBLoad,tempRastName )
     try:
         sdbquery = "create array %s <%s:int64, %s:int64, id:%s> [xy=0:*,?,?]" % (tempRastName, dim1, dim2, rasterValueDataType)
         sdb.query(sdbquery)
@@ -202,7 +230,9 @@ def LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, dim1
         sdb.query(sdbquery)
 
     start = timeit.default_timer()
-    sdbquery = "load(%s,'%s', -2, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, rasterValueDataType)
+
+
+    sdbquery = "load(%s,'%s', %s, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, loadMode, rasterValueDataType)
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     loadTime = stop-start
@@ -218,8 +248,8 @@ def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, te
     grouped_aggregate(equi_join(between(GLC2000, 4548, 6187, 7332, 12662), polygon), 'left_names=x,y', 'right_names=x,y'), min(value), max(value), avg(value), count(value), id)
 
     """
-
-    binaryLoadPath, loadTime = LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, rasterValueDataType, 'y', 'x', verbose)
+    binaryLoadPath = "%s/%s.scidb" % (tempSciDBLoad, tempRastName)
+    binaryLoadPath, loadTime = LoadArraytoSciDB(sdb, tempSciDBLoad, tempRastName, binaryLoadPath, rasterValueDataType, 'y', 'x', verbose, -1)
     
     start = timeit.default_timer()
     sdbquery = "grouped_aggregate(equi_join(between(%s, %s, %s, %s, %s), %s, 'left_names=x,y', 'right_names=x,y', 'algorithm=hash_replicate_right'), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, minY, minX, maxY, maxX, tempRastName) 
@@ -309,7 +339,27 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, hostURL, sta
             tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
             tempRastName = csvPath.split('/')[-1].split('.')[0]
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad, tempRastName, ulY, ulX, lrY, lrX, verbose)
+
+        elif statsMode == 4:
+            binaryPath = '/home/scidb/scidb_data/0'
+            #WriteMultiDimensionalArray(rasterizedArray, csvPath)
+            #tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
+            #testArray = [ [1,2,3,3], [3,4,2,1] , [3,4,2,1], [3,1,3,1]]
+            #dataset.ravel().tobytes()
+            tempRastName = 'p_zones'
+            chunkedArrays = np.array_split(ArrayToBinary(rasterizedArray), 4)
             
+            for p, chunk in enumerate(chunkedArrays):
+                binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, p)
+                with open(binaryPartitionPath, 'wb') as fileout:
+                    fileout.write(chunk.ravel().tobytes())
+
+            binaryLoadPath = binaryPartitionPath.split("/")[-1]
+            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
+
+            transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
+                
+
         
         print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t+1 ))
         if verbose: print("TransferTime: %s" % (transferTime)  )
