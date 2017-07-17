@@ -55,8 +55,12 @@ class RasterReader(object):
         """
         Function creates the final destination array
         """
-        from scidbpy import connect
-        sdb = connect(theURL)
+        if theURL=="NoSHIM":
+            import scidb
+            sdb = scidb.iquery()
+        else:
+            from scidbpy import connect
+            sdb = connect(theURL)
         
         try:           
             sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
@@ -110,21 +114,26 @@ def GDALReader(inParams):
     """
 
     """
-    from scidbpy import connect   
+     
     import os
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     
-    #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
-    
-    #print(inParams)
+    print(inParams)
 
     theMetadata = inParams[0]
     theInstance = inParams[1]
     theRasterPath = inParams[2]
     theSciDBOutPath = inParams[3]
     theSciDBLoadPath = inParams[4]
-    sdb = connect(inParams[5])
+
+    if inParams[5] == "NoSHIM":
+        import scidb
+        sdb = scidb.iquery()
+    else:
+        from scidbpy import connect  
+        #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+        sdb = connect(inParams[5])
 
 
     #print(theMetadata, theInstance, thePath)
@@ -311,7 +320,8 @@ def argument_parser():
 
     parser = argparse.ArgumentParser(description= "multiprocessing module for loading GDAL read data into SciDB with multiple instances")    
     parser.add_argument("-Instances", required =True, nargs='*', type=int, help="Number of SciDB Instances for parallel data loading", dest="instances")    
-    parser.add_argument("-Host", required =True, help="SciDB host for connection", dest="host", default="localhost")    
+    parser.add_argument("-Host", required =True, help="SciDB host for connection", dest="host", default="localhost")
+    #If host = NoSHIM, then use the cmd iquery   
     parser.add_argument("-RasterPath", required =True, help="Input file path for the raster", dest="rasterPath")    
     parser.add_argument("-ScidbArray", required =True, help="Name of the destination array", dest="rasterName")
     parser.add_argument("-AttributeNames", required =True, help="Name of the destination array", dest="attributes", default="value")
