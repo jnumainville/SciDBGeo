@@ -76,12 +76,16 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     3. Redimension and insert data into the mask array
     4. Conduct a global join using the between operators
     """
-    import re
-    afl = sdb.afl
+    import re    
     tempArray = "mask"
 
-    theArray = afl.show(SciDBArray)
-    results = theArray.contents()
+    #afl = sdb.afl
+    #theArray = afl.show(SciDBArray)
+    #results = theArray.contents()
+
+    results = sdb.queryAFL("show(%s)" % (SciDBArray))
+    results = results.decode("utf-8")
+    #print(results)
     #SciDBArray()\n[('polygon<x:int64,y:int64,id:int16> [xy=0:*:0:1000000]')]\n
     #[('GLC2000<value:uint8> [x=0:40319:0:100000; y=0:16352:0:100000]')]
     
@@ -277,11 +281,10 @@ def SubArray_SummaryStats(sdb, polygonSciDBArrayName, SciDBArray, minX, minY, ma
     return queryTime
 
 
-def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, hostURL, statsMode=1, filePath=None, verbose=False):
+def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False):
     "This function conducts zonal stats in SciDB"
     
     outDictionary = OrderedDict()
-    sdb = scidbpy.connect(hostURL)
 
     for t in range(NumberofTests):
         theTest = "test_%s" % (t+1)
@@ -351,7 +354,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, hostURL, sta
             #dataset.ravel().tobytes()
             tempRastName = 'p_zones'
             chunkedArrays = np.array_split(ArrayToBinary(rasterizedArray), 4)
-            
+            print("Partitioning data")
             for p, chunk in enumerate(chunkedArrays):
                 binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, p)
                 with open(binaryPartitionPath, 'wb') as fileout:
@@ -369,7 +372,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, hostURL, sta
         outDictionary[theTest] = OrderedDict( [ ("test",theTest), ("SciDBArrayName",SciDBArray), ("BoundaryFilePath",boundaryPath), ("transfer_time",transferTime), ("rasterization_time",rasterizeTime), ("query_time",queryTime), ("total_time",transferTime+rasterizeTime+queryTime) ] )
     
 
-    sdb.reap()
     if filePath:
         WriteFile(filePath, outDictionary)
     print("Finished")
@@ -398,7 +400,15 @@ def argument_parser():
 if __name__ == '__main__':
     args = argument_parser().parse_args()
     if CheckFiles(args.Shapefile, args.Raster):
-        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, args.host, args.mode, args.CSV, args.verbose)
+        if args.host == "NoSHIM":
+            import scidb
+            sdb = scidb.iquery()
+            print("No SHIM")
+        else:
+            from scidbpy import connect  
+            #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+            sdb = connect(args.host)
+        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
     else:
         print(args.Shapefile, args.Raster)
 
