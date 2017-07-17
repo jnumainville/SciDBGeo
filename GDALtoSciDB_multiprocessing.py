@@ -119,7 +119,7 @@ def GDALReader(inParams):
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
     
-    print(inParams)
+    #print(inParams)
 
     theMetadata = inParams[0]
     theInstance = inParams[1]
@@ -182,7 +182,7 @@ def GDALReader(inParams):
         os.remove(rasterBinaryFilePath)
         return (theMetadata['version'], -999, -999, -999)
     
-    del raster
+    del raster, array
     
 
 def WriteMultiDimensionalArray(rArray, binaryFilePath):
