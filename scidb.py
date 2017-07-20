@@ -35,4 +35,12 @@ class iquery(object):
         del p
         return 
 
+    def queryAFL(self, theQuery):
+        scidbArguments = """iquery -aq "%s";""" % (theQuery)
+        #print(scidbArguments)
+        p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
+        p.wait()
+        out, err = p.communicate()
+        #print("OUT", out)
 
+        return out

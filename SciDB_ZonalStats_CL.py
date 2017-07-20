@@ -11,6 +11,8 @@ from osgeo import ogr, gdal
 import scidbpy, timeit, csv, argparse, os, re
 from collections import OrderedDict
 import numpy as np
+import multiprocessing as mp
+import itertools
 
 def world2Pixel(geoMatrix, x, y):
     """
@@ -280,6 +282,19 @@ def SubArray_SummaryStats(sdb, polygonSciDBArrayName, SciDBArray, minX, minY, ma
 
     return queryTime
 
+def WriteBinaryFile(params):
+    """
+    This function writes a binary file
+    """
+
+    binaryPath = params[0]
+    datastore, chunk = params[1]
+
+    binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
+    #print(binaryPartitionPath)
+    with open(binaryPartitionPath, 'wb') as fileout:
+        fileout.write(chunk.ravel().tobytes())
+
 
 def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False):
     "This function conducts zonal stats in SciDB"
@@ -352,20 +367,33 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             #tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
             #testArray = [ [1,2,3,3], [3,4,2,1] , [3,4,2,1], [3,1,3,1]]
             #dataset.ravel().tobytes()
+            
+            SciDBInstances = 4
+            pool = mp.Pool(SciDBInstances)
+            #results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
+            print("Converting to Binary and partitioning data")
             tempRastName = 'p_zones'
-            chunkedArrays = np.array_split(ArrayToBinary(rasterizedArray), 4)
-            print("Partitioning data")
-            for p, chunk in enumerate(chunkedArrays):
-                binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, p)
-                with open(binaryPartitionPath, 'wb') as fileout:
-                    fileout.write(chunk.ravel().tobytes())
+            start = timeit.default_timer()
+            chunkedArrays = np.array_split(ArrayToBinary(rasterizedArray), SciDBInstances)
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))
 
-            binaryLoadPath = binaryPartitionPath.split("/")[-1]
-            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
+            results = pool.imap(WriteBinaryFile, zip( itertools.repeat(binaryPath), ((p, chunk) for p, chunk in enumerate(chunkedArrays))  )    )
+                #pool.map_async(GDALReader, itertools.izip(itertools.repeat(rasterFilePath),  ( (arrayReadSettings[r]["ReadWindow"], r) for r in arrayReadSettings)   )  )
+            pool.close()
+            pool.join()
+            #p, chunk, itertools.repeat(binaryPath)
 
+
+                # binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, p)
+                # with open(binaryPartitionPath, 'wb') as fileout:
+                #     fileout.write(chunk.ravel().tobytes())
+
+            binaryLoadPath = "p_zones.scidb" #binaryPartitionPath.split("/")[-1]
+            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
+            
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
                 
-
         
         print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t+1 ))
         if verbose: print("TransferTime: %s" % (transferTime)  )
