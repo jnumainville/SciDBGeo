@@ -66,7 +66,7 @@ class RasterReader(object):
             sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
             print("Created array %s" % (rasterArrayName))
         except:
-            print("Array %s already exists. Removing" % (rasterArrayName))
+            print("******Array %s already exists. Removing" % (rasterArrayName))
             sdb.query("remove(%s)" % (rasterArrayName))
             sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, attribute, rasterValueDataType, height-1, chunk, width-1, chunk) )
 
@@ -175,7 +175,14 @@ def GDALReader(inParams):
         print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"]))
         dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
         if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
-        # if theMetadata['version'] > 0: sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
+        if theMetadata['version'] > 1: 
+            #sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
+            versions = sdb.versions(theMetadata['scidbArray'])
+            print("Versions you could remove: %s" % (versions))
+            for v in versions[:-1]:
+                sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], v) )
+
+        os.remove(rasterBinaryFilePath)
         return (theMetadata['version'], writeTime, loadTime, redimensionTime)
     else:
         print("Error Loading")
@@ -323,7 +330,7 @@ def argument_parser():
     parser.add_argument("-Host", required =True, help="SciDB host for connection", dest="host", default="localhost")
     #If host = NoSHIM, then use the cmd iquery   
     parser.add_argument("-RasterPath", required =True, help="Input file path for the raster", dest="rasterPath")    
-    parser.add_argument("-ScidbArray", required =True, help="Name of the destination array", dest="rasterName")
+    parser.add_argument("-SciDBArray", required =True, help="Name of the destination array", dest="rasterName")
     parser.add_argument("-AttributeNames", required =True, help="Name of the destination array", dest="attributes", default="value")
     parser.add_argument("-Tiles", required =False, type=int, help="Size in rows of the read window, default: 1", dest="tiles", default=1)
     parser.add_argument("-Chunk", required =False, type=int, help="Chunk size for the destination array, default: 1,000", dest="chunk", default=1000)
