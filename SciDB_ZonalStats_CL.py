@@ -17,8 +17,8 @@ import itertools
 def world2Pixel(geoMatrix, x, y):
     """
     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
-    the pixel location of a geospatial coordinate
-    """
+    the pixel location of a geospatial 
+    """coordinate
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
     xDist = geoMatrix[1]
@@ -362,7 +362,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, binaryLoadPath, tempRastName, ulY, ulX, lrY, lrX, verbose)
 
         elif statsMode == 4:
-            binaryPath = '/home/scidb/scidb_data/0'
+            binaryPath = '/home/scidb/scidb_data/0' #/storage
             #WriteMultiDimensionalArray(rasterizedArray, csvPath)
             #tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
             #testArray = [ [1,2,3,3], [3,4,2,1] , [3,4,2,1], [3,1,3,1]]
@@ -379,17 +379,15 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             print("Took: %s" % (stop-start))
 
             results = pool.imap(WriteBinaryFile, zip( itertools.repeat(binaryPath), ((p, chunk) for p, chunk in enumerate(chunkedArrays))  )    )
-                #pool.map_async(GDALReader, itertools.izip(itertools.repeat(rasterFilePath),  ( (arrayReadSettings[r]["ReadWindow"], r) for r in arrayReadSettings)   )  )
+            #pool.map_async(GDALReader, itertools.izip(itertools.repeat(rasterFilePath),  ( (arrayReadSettings[r]["ReadWindow"], r) for r in arrayReadSettings)   )  )
             pool.close()
             pool.join()
-            #p, chunk, itertools.repeat(binaryPath)
-
 
                 # binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, p)
                 # with open(binaryPartitionPath, 'wb') as fileout:
                 #     fileout.write(chunk.ravel().tobytes())
 
-            binaryLoadPath = "p_zones.scidb" #binaryPartitionPath.split("/")[-1]
+            binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0'  #binaryPartitionPath.split("/")[-1]
             LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
             
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
