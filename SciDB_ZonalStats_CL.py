@@ -380,7 +380,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
         elif statsMode == 4:
             #This is the serial version
             print("Serial Version of Zonal Stats")
-            binaryPath = '/home/scidb/scidb_data/0' #/storage
+            binaryPath = '/home/scidb/scidb_data/0' #/storage/0/0
             print("Converting to Binary")
             tempRastName = 'p_zones'
             start = timeit.default_timer()
@@ -390,7 +390,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
             print("Writing Binary File")
             start = timeit.default_timer()
-            binaryLoadPath = "%s/0/p_zones.scidb" % (binaryPath)
+            binaryLoadPath = "%s/p_zones.scidb" % (binaryPath)
             with open(binaryLoadPath, 'wb') as fileout:
                 fileout.write(binaryArray.ravel().tobytes())
             stop = timeit.default_timer()
@@ -398,7 +398,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             
             print("Loading 1D File")
             start = timeit.default_timer()
-            #binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0'  #binaryPartitionPath.split("/")[-1]
+            #binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/0'  #binaryPartitionPath.split("/")[-1]
             LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
             stop = timeit.default_timer()
             print("Took: %s" % (stop-start))    
