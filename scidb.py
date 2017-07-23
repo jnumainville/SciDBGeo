@@ -3,20 +3,24 @@ class iquery(object):
     def __init__(self,):
         import subprocess
         import csv
-        
+        import re
         self.subprocess = subprocess
         self.PIPE = subprocess.PIPE
         self.csv = csv
+        self.re = re
 
     def query(self, theQuery):
         scidbArguments = """iquery -anq "%s";""" % (theQuery)
         print(scidbArguments)
-        p = self.subprocess.Popen(scidbArguments, shell=True)
+        p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, stderr=self.subprocess.PIPE, shell=True)
         p.wait()
-        #print(p.communicate)
-        del p
+        out, err = p.communicate()
 
-        return
+        if len(err) > 1: raise
+        #print("Error: %s" % (err))
+        #print("Output: %s" % (out))
+        
+        return p
 
     def queryResults(self, theQuery, thePath):
         import os
