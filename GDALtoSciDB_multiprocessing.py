@@ -7,7 +7,7 @@ class RasterReader(object):
 
     def __init__(self, RasterPath, scidbHost, scidbArray, attribute, chunksize, tiles):
         """
-        Initializethe class RasterReader
+        Initialize the class RasterReader
         """
         self.width, self.height, self.datatype = self.GetRasterDimensions(RasterPath)
         self.RasterMetadata = self.CreateArrayMetadata(scidbArray, self.width, self.height, chunksize, tiles, attribute)
@@ -23,9 +23,19 @@ class RasterReader(object):
         scidbInstance = SciDB Instance IDs
         rasterFilePath = Absolute Path to the GeoTiff
         """
+
+
+        # if randomload:
+        #     import random
+        #     random.seed(5)
+        #     theKeys = random.shuffle(list(self.RasterMetadata.keys()))
+        #     print(theKeys)
+        # else:
+        #     theKeys = self.RasterMetadata.keys()
+        
         for key, process, filepath, outDirectory, loadDirectory, host in zip(self.RasterMetadata.keys(), itertools.cycle(scidbInstances), itertools.repeat(rasterFilePath), itertools.repeat(outPath), itertools.repeat(loadPath), itertools.repeat(host)):
             yield self.RasterMetadata[key], process, filepath, outDirectory, loadDirectory, host
-        
+            
     def GenerateAttributesInfo(self, attribute):
         """
         still working on this, 
@@ -79,7 +89,8 @@ class RasterReader(object):
         The loops are 
         """
         import math
-        from collections import OrderedDict
+        from collections import OrderedDict        
+        
         RasterReads = OrderedDict()
         rowMax = 0
         
@@ -99,6 +110,7 @@ class RasterReader(object):
                 #print(rowsRemaining, columnsRemaining, version_num, x_version,y_version,)
                 RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet), ("yOffSet",yOffSet), \
                     ("xWindow", columnsRemaining), ("yWindow", rowsRemaining), ("version", version_num), ("attribute", attribute), ("scidbArray", theArray)])
+
             
             rowMax += math.ceil(width/(chunk*tiles))
 
@@ -157,9 +169,9 @@ def GDALReader(inParams):
     ## WriteMultiDimensionalArray(array, rasterBinaryFilePath)
     WriteArray(array, rasterBinaryFilePath)
     stop = timeit.default_timer()
-
-    # print(theMetadata['version'] )
     writeTime = stop-start
+    
+
     os.chmod(rasterBinaryFilePath, 0o755)
     CreateLoadArray(sdb, tempArray, theMetadata['attribute'], rasterValueDataType)
     start = timeit.default_timer()
@@ -167,10 +179,12 @@ def GDALReader(inParams):
     if LoadOneDimensionalArray(sdb, theInstance, tempArray, rasterValueDataType, rasterBinaryLoadPath):
         stop = timeit.default_timer()
         loadTime = stop-start
+        
         start = timeit.default_timer()
         RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
         stop = timeit.default_timer()
         redimensionTime = stop-start
+        
         RemoveTempArray(sdb, tempArray)
         print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"]))
         dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
@@ -178,9 +192,10 @@ def GDALReader(inParams):
         if theMetadata['version'] > 1: 
             #sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
             versions = sdb.versions(theMetadata['scidbArray'])
-            print("Versions you could remove: %s" % (versions))
-            for v in versions[:-1]:
-                sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], v) )
+            if len(versions) > 1: 
+                print("Versions you could remove: %s" % (versions))
+                for v in versions[:-1]:
+                    sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], v) )
 
         os.remove(rasterBinaryFilePath)
         return (theMetadata['version'], writeTime, loadTime, redimensionTime)
@@ -234,6 +249,8 @@ def WriteArray(theArray, csvPath):
         #dataset = np.array(np.vstack((column_index, rows_index, values))
         #print(dataset.dtype)
         fileout.write(dataset.ravel().tobytes())
+
+    del dataset, column_index, row_index, values
 
 def WriteFile(filePath, theDictionary):
     """
@@ -309,7 +326,7 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
 
         timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2], "redimensionTime": i[3] } for i in results}
 
-        if csvPath:
+        if csvPath and len(results) > 1:
             WriteFile(csvPath, timeDictionary)
 
     else:
@@ -338,7 +355,7 @@ def argument_parser():
     parser.add_argument("-TempOut", required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath',)
     parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
     parser.add_argument("-CSV", required =False, help="Create CSV file", dest="csv", default="None")
-
+    #parser.add_argument("-r", required =False, action="store_true",  help="randomly load data into the array", dest="randomload", default=False)
     return parser
 
 
