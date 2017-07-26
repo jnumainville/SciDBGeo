@@ -186,7 +186,7 @@ def GDALReader(inParams):
         redimensionTime = stop-start
         
         RemoveTempArray(sdb, tempArray)
-        print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"]))
+        print("Loaded version %s of %s" % (theMetadata['version']+1, theMetadata["Loops"] ))
         dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
         if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
         if theMetadata['version'] > 1: 
@@ -234,24 +234,19 @@ def WriteArray(theArray, csvPath):
     col, row = theArray.shape
     with open(csvPath, 'wb') as fileout:
 
-        thecolumns =[y for y in range(col)]
-        column_index = np.array(np.repeat(thecolumns, row), dtype=np.dtype('int64'))
+        #Oneliner that creates the column index. Pull out [y for y in range(col)] to see how it works
+        column_index = np.array(np.repeat([y for y in range(col)], row), dtype=np.dtype('int64'))
         
-        therows = [x for x in range(row)]
-        allrows = [therows for i in range(col)]
-        row_index = np.array(np.concatenate(allrows), dtype=np.dtype('int64'))
+        #Oneliner that creates the row index. Pull ou the nested loop first: [x for x in range(row)]
+        #Then pull the full list comprehension: [[x for x in range(row)] for i in range(col)]
+        row_index = np.array(np.concatenate([[x for x in range(row)] for i in range(col)]), dtype=np.dtype('int64'))
 
-        values = theArray.ravel()
-        vdatatype = theArray.dtype
+        fileout.write( np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('x','int64'),('y','int64'),('value',theArray.dtype)]).ravel().tobytes() )
 
-        arraydatypes = 'int64, int64, %s' % (vdatatype)
-        dataset = np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatypes)
-        #dataset = np.array(np.vstack((column_index, rows_index, values))
-        #print(dataset.dtype)
-        fileout.write(dataset.ravel().tobytes())
+        #fileout.write(np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatypes).ravel().tobytes() )
 
-    del dataset, column_index, row_index, values
-
+    del column_index, row_index, theArray
+    
 def WriteFile(filePath, theDictionary):
     """
     This function writes out the dictionary as csv
@@ -323,10 +318,10 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
             print(multiprocessing.get_logger())
         #pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
         #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
-
+        #print(results, dir(results))
         timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2], "redimensionTime": i[3] } for i in results}
 
-        if csvPath and len(results) > 1:
+        if csvPath:
             WriteFile(csvPath, timeDictionary)
 
     else:
