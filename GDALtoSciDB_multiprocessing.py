@@ -381,5 +381,3 @@ if __name__ == '__main__':
     #arrayReadSettings = RasterPrep(args.rasterPath, int(args.window), args.host, args.rasterName)
     #main(pythonVersion, int(args.processes), args.rasterPath)
 
-    
->>>>>>> 23f343c2a14be6d7b67c96739d75291d7182714a
