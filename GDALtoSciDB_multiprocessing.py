@@ -193,7 +193,7 @@ def GDALReader(inParams):
         redimensionTime = stop-start
         
         RemoveTempArray(sdb, tempArray)
-        print("Loaded version %s of %s" % (theMetadata['version']+1, theMetadata["Loops"] ))
+        print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"] ))
         dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
         if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
         if theMetadata['version'] > 1: 
