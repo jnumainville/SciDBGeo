@@ -84,7 +84,7 @@ class iquery(object):
 
         #print("OUT", out)
         #results = out.decode("utf-8")
-        resultsList = out.decode("utf-8").results.split("\n")
+        resultsList = out.decode("utf-8").split("\n")
         versions = []
         #b"{VersionNo} version_id,timestamp\n{1} 10,'2017-06-17 02:52:59'\n{2} 11,'2017-06-17 02:53:35'\n"
         try:
