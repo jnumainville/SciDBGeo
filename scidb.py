@@ -16,8 +16,9 @@ class iquery(object):
         p.wait()
         out, err = p.communicate()
 
-        if len(err) > 1: raise
-        #print("Error: %s" % (err))
+        if err > 1: 
+            print("Error: %s" % (err))
+            raise
         #print("Output: %s" % (out))
         del p
         return out
