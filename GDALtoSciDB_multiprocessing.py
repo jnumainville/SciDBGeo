@@ -157,12 +157,12 @@ def GDALReader(inParams):
     
     start = timeit.default_timer()
     #WriteMultiDimensionalArray(array, rasterBinaryFilePath)
-    print(rasterBinaryFilePath)
+    #print(rasterBinaryFilePath)
     WriteArray(array, rasterBinaryFilePath)
     stop = timeit.default_timer()
     writeTime = stop-start
     #del raster, array
-    print(theMetadata['version'], writeTime) #locals())
+    #print(theMetadata['version'], writeTime) #locals())
 
     ### Used to evaluate the amount of memory used ####    
     # if theMetadata['version'] == 0:

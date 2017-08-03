@@ -7,7 +7,7 @@ class iquery(object):
         self.subprocess = subprocess
         self.PIPE = subprocess.PIPE
         self.csv = csv
-        self.re = re
+
 
     def query(self, theQuery):
         scidbArguments = """iquery -anq "%s";""" % (theQuery)
@@ -19,8 +19,8 @@ class iquery(object):
         if len(err) > 1: raise
         #print("Error: %s" % (err))
         #print("Output: %s" % (out))
-        
-        return p
+        del p
+        return out
 
     def queryResults(self, theQuery, thePath):
         import os
@@ -50,11 +50,23 @@ class iquery(object):
         return out
 
     def queryCSV(self, theQuery, theCSVPath):
-        scidbArguments = """iquery -aq "%s" -o CSV -r %s;""" % (theQuery, theCSVPath)
-        #print(scidbArguments)
-        p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
-        p.wait()
-        out, err = p.communicate()
+        """
+
+        """
+
+        import os
+        
+        if os.pathisdir( "/".join(theCSVPath.split("/")[:-1]) ):
+        
+            scidbArguments = """iquery -aq "%s" -o CSV -r %s;""" % (theQuery, theCSVPath)
+            #print(scidbArguments)
+            p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
+            p.wait()
+
+        else:
+            print("Bad CSV path: %s" % (theCSVPath))
+            
+        #out, err = p.communicate()
         #print("OUT", out)
 
         return theCSVPath
@@ -70,9 +82,9 @@ class iquery(object):
         p.wait()
         out, err = p.communicate()
 
-        print("OUT", out)
-        results = out.decode("utf-8")
-        resultsList = results.split("\n")
+        #print("OUT", out)
+        #results = out.decode("utf-8")
+        resultsList = out.decode("utf-8").results.split("\n")
         versions = []
         #b"{VersionNo} version_id,timestamp\n{1} 10,'2017-06-17 02:52:59'\n{2} 11,'2017-06-17 02:53:35'\n"
         try:
