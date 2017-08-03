@@ -202,7 +202,11 @@ def GDALReader(inParams):
             if len(versions) > 1: 
                 print("Versions you could remove: %s" % (versions))
                 for v in versions[:-1]:
-                    sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], v) )
+                    try:
+                        sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], v) )
+                    except:
+                        print("Couldn't remove version %s from array %s" % (theMetadata['scidbArray'], v) )
+                        pass
 
         os.remove(rasterBinaryFilePath)
         gc.collect()
