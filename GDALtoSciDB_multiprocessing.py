@@ -1,8 +1,9 @@
 # import multiprocessing as mp
+# import dill, pathos
 from pathos.multiprocessing import ProcessingPool
 import itertools, timeit
 import numpy as np
-import math, csv, os, gc, sys, dill, pathos
+import math, csv, os, gc, sys, 
 from osgeo import gdal
 from gdalconst import GA_ReadOnly
 from collections import OrderedDict
@@ -316,8 +317,8 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
     
-    pool = ProcessingPool(1)
-    #pool = mp.Pool(1, maxtasksperchild=1)
+    pool = ProcessingPool(len(SciDBInstances))
+    #pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)
 
     if pyVersion[0] > 2:
         try:
@@ -368,8 +369,7 @@ if __name__ == '__main__':
     args = argument_parser().parse_args()
     start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
-# print(dir(RasterInformation.RasterMetadata))
-    WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
+    #WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
     main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath, args.csv)
     stop = timeit.default_timer()
     print("Finished. Time to complete %s minutes" % ((stop-start)/60))
