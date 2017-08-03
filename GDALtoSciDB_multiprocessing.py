@@ -152,6 +152,8 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterValueDataType
     except:
         print("Error Loading DimensionalArray")
 
+
+
 #def WriteBinaryFile(rasterBinaryFileName):
 
 #     for version_num, y in enumerate(range(0, height,yWindow)):
@@ -197,7 +199,7 @@ def main(pyVersion, numProcesses, rasterFilePath):
     pool = mp.Pool(numProcesses)
 
     if pyVersion[0] > 2:
-        pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
+        pool.imap(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
         ( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
 
     else:
