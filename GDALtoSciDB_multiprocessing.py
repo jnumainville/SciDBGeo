@@ -1,9 +1,10 @@
-# import multiprocessing as mp
+# from pathos.multiprocessing import ProcessingPool
 # import dill, pathos
-from pathos.multiprocessing import ProcessingPool
+
+import multiprocessing as mp
 import itertools, timeit
 import numpy as np
-import math, csv, os, gc, sys, 
+import math, csv, os, gc, sys
 from osgeo import gdal
 from gdalconst import GA_ReadOnly
 from collections import OrderedDict
@@ -317,8 +318,8 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
     
-    pool = ProcessingPool(len(SciDBInstances))
-    #pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)
+    #pool = ProcessingPool(len(SciDBInstances))
+    pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)
 
     if pyVersion[0] > 2:
         try:
