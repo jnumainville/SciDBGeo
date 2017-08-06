@@ -117,6 +117,42 @@ class RasterReader(object):
             #print(DictionaryKeys)
         return RasterReads
 
+def GlobalRasterLoading(theSHIM, theMetadata):
+    """
+    This function is built in an effort to separate the redimensioning from the loading.
+    I think redimensioning affects the performance of the load
+    """
+
+    if theSHIM == "NoSHIM":
+        import scidb
+        sdb = scidb.iquery()
+    else:
+        from scidbpy import connect  
+        #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
+        sdb = connect(theSHIM)
+
+    theData = theMetadata.RasterMetadata
+    for theKey in theMetadata.RasterMetadata.keys():
+        start = timeit.default_timer()
+        tempArray = "temprast_%s" % (theData[theKey]['version'])
+        RedimensionAndInsertArray(sdb, tempArray, theData[theKey]['scidbArray'], theData[theKey]['xOffSet'], theData[theKey]['yOffSet'])    
+        stop = timeit.default_timer()
+        redimensionTime = stop-start
+        
+        RemoveTempArray(sdb, tempArray)
+        print("Inserted version %s of %s" % (theData[theKey]['version'], theData[theKey]["Loops"] ))
+        dataLoadingTime = (redimensionTime * theData[theKey]["Loops"]) / 60 
+        if theData[theKey]['version'] == 0: print("Estimated time for redimensioning the dataset in minutes %s: RedimensionTime: %s" % ( dataLoadingTime, redimensionTime))
+        if theData[theKey]['version'] > 1: 
+            #sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
+            versions = sdb.versions(theData[theKey]['scidbArray'])
+            if len(versions) > 1: 
+                print("Versions you could remove: %s" % (versions))
+                for v in versions[:-1]:
+                    try:
+                        sdb.query("remove_versions(%s, %s)" % (theData[theKey]['scidbArray'], v) )
+                    except:
+                        print("Couldn't remove version %s from array %s" % (v, theData[theKey]['scidbArray']) )
 
 # @profile
 def GDALReader(inParams):
@@ -169,8 +205,6 @@ def GDALReader(inParams):
     #     totalMemory = sum([sys.getsizeof(k) for k in locals().keys()])/10**6
     #     print("Total Memory used: %s" % (totalMemory ))
 
-
-
     # ### Would be a good diagnostic tool if I could get an estimate on writing time
     # if writeTime > 2:     
     #     # for k in locals().keys():
@@ -187,35 +221,35 @@ def GDALReader(inParams):
         stop = timeit.default_timer()
         loadTime = stop-start
         
-        start = timeit.default_timer()
-        RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
-        stop = timeit.default_timer()
-        redimensionTime = stop-start
+        # # start = timeit.default_timer()
+        # # RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['xOffSet'], theMetadata['yOffSet'])    
+        # # stop = timeit.default_timer()
+        # # redimensionTime = stop-start
         
-        RemoveTempArray(sdb, tempArray)
-        print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"] ))
-        dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
-        if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
-        if theMetadata['version'] > 1: 
-            #sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
-            versions = sdb.versions(theMetadata['scidbArray'])
-            if len(versions) > 1: 
-                print("Versions you could remove: %s" % (versions))
-                for v in versions[:-1]:
-                    try:
-                        sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], v) )
-                    except:
-                        print("Couldn't remove version %s from array %s" % (theMetadata['scidbArray'], v) )
-                        pass
+        # RemoveTempArray(sdb, tempArray)
+        # print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"] ))
+        # dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
+        # if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
+        # if theMetadata['version'] > 1: 
+        #     #sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
+        #     versions = sdb.versions(theMetadata['scidbArray'])
+        #     if len(versions) > 1: 
+        #         print("Versions you could remove: %s" % (versions))
+        #         for v in versions[:-1]:
+        #             try:
+        #                 sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], v) )
+        #             except:
+        #                 print("Couldn't remove version %s from array %s" % (v, theMetadata['scidbArray']) )
+        #                 pass
 
         os.remove(rasterBinaryFilePath)
         gc.collect()
-        return (theMetadata['version'], writeTime, loadTime, redimensionTime)
+        return (theMetadata['version'], writeTime, loadTime)
 
     else:
         print("Error Loading")
         os.remove(rasterBinaryFilePath)
-        return (theMetadata['version'], -999, -999, -999)
+        return (theMetadata['version'], -999, -999)
     
     
 def WriteMultiDimensionalArray(rArray, binaryFilePath):
@@ -254,10 +288,7 @@ def WriteArray(theArray, csvPath):
 
         fileout.write( np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('x','int64'),('y','int64'),('value',theArray.dtype)]).ravel().tobytes() )
 
-        #fileout.write(np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatypes).ravel().tobytes() )
-
     del column_index, row_index, theArray
-    gc.collect()
 
 def WriteFile(filePath, theDictionary):
     """
@@ -322,8 +353,8 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
     
-    #pool = ProcessingPool(len(SciDBInstances))
-    pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)
+    #pool = ProcessingPool(len(SciDBInstances))  #Pathos module
+    pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)    #Multiprocessing module
 
     if pyVersion[0] > 2:
         try:
@@ -333,7 +364,7 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
         #pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
         #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
         #print(results, dir(results))
-        timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2], "redimensionTime": i[3] } for i in results}
+        timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2] } for i in results}
 
         if csvPath:
             WriteFile(csvPath, timeDictionary)
@@ -369,21 +400,18 @@ def argument_parser():
 
 
 if __name__ == '__main__':
+    #Main function
     pythonVersion = sys.version_info
-
     args = argument_parser().parse_args()
     start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
     #WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
     main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath, args.csv)
+    GlobalRasterLoading(args.host, RasterInformation)
+
     stop = timeit.default_timer()
     print("Finished. Time to complete %s minutes" % ((stop-start)/60))
     # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath,args.OutPath, args.SciDBLoadPath, args.host):
     #     print(r)
-    
-
-    #RasterPath, SciDBHost, SciDBArray, attribute, chunksize, tiles
-    #arrayReadSettings = RasterPrep(args.rasterPath, int(args.window), args.host, args.rasterName)
-    #main(pythonVersion, int(args.processes), args.rasterPath)
 
    
