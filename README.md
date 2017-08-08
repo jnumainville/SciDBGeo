@@ -2,7 +2,6 @@
 Code for analysing big raster datasets in SciDB
 
 1) GDALtoSciDB_multiprocessing script is a python file that will load your datasets into SciDB Clsuter using multiple SciDB instances. This is compatible with single instances
-
 usage: GDALtoSciDB_multiprocessing.py [-h] -Instances
                                       [INSTANCES [INSTANCES ...]] -Host HOST
                                       -RasterPath RASTERPATH -SciDBArray
@@ -12,8 +11,7 @@ usage: GDALtoSciDB_multiprocessing.py [-h] -Instances
                                       [-SciDBLoadPath SCIDBLOADPATH]
                                       [-CSV CSV]
 
-multiprocessing module for loading GDAL read data into SciDB with multiple
-instances
+multiprocessing module for loading GDAL read data into SciDB with 1 or more instances
 
 optional arguments:
     -h, --help              show this help message and exit
@@ -35,10 +33,9 @@ optional arguments:
 
 
 2) SciDB_ZonalStats_CL is a command line script for conducting zonal stats
-
 usage: SciDB_ZonalStats_CL.py [-h] -SciDBArray SCIARRAY -Raster RASTER
-                              -Shapefile SHAPEFILE [-Tests RUNS] -Mode MODE
-                              [-CSV CSV] [-v] [-Host HOST]
+                                -Shapefile SHAPEFILE [-Tests RUNS] -Mode MODE
+                                [-CSV CSV] [-v] [-Host HOST]
 
 optional arguments:
   -h, --help            show this help message and exit
