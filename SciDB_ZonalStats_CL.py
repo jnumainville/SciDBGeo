@@ -11,11 +11,13 @@ from osgeo import ogr, gdal
 import scidbpy, timeit, csv, argparse, os, re
 from collections import OrderedDict
 import numpy as np
+import multiprocessing as mp
+import itertools
 
 def world2Pixel(geoMatrix, x, y):
     """
     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
-    the pixel location of a geospatial coordinate
+    the pixel location of a geospatial 
     """
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
@@ -130,7 +132,7 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
 
     return insertTime, queryTime
 
-def ArrayToBinary(theArray):
+def ArrayToBinary(theArray, yOffSet=0):
     """
     Use Numpy tricks to write a numpy array in binary format with indices 
 
@@ -139,11 +141,11 @@ def ArrayToBinary(theArray):
     """
     col, row = theArray.shape
     
-    thecolumns =[y for y in range(col)]
+    thecolumns =[y for y in np.arange(0+yOffSet, col+yOffSet)]
     column_index = np.array(np.repeat(thecolumns, row), dtype=np.dtype('int64'))
     
-    therows = [x for x in range(row)]
-    allrows = [therows for i in range(col)]
+    therows = [x for x in np.arange(row)]
+    allrows = [therows for i in np.arange(col)]
     row_index = np.array(np.concatenate(allrows), dtype=np.dtype('int64'))
 
     values = theArray.ravel()
@@ -280,6 +282,35 @@ def SubArray_SummaryStats(sdb, polygonSciDBArrayName, SciDBArray, minX, minY, ma
 
     return queryTime
 
+def WriteBinaryFile(params):
+    """
+    This function writes a binary file
+    """
+
+    binaryPath = params[0]
+    datastore, chunk = params[1]
+
+    binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
+    #print(binaryPartitionPath)
+    with open(binaryPartitionPath, 'wb') as fileout:
+        fileout.write(chunk.ravel().tobytes())
+
+def ParallelProcessing(params):
+    """
+    This function wraps around the ArrayToBinary and WriteBinaryFile and 
+    """
+    #print("In Parallel Processing")
+    #print(params)
+    binaryPath = params[0]
+    yOffSet = params[1]
+    #print(yOffSet)
+    datastore, arrayChunk = params[2]
+
+    binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
+    #print(binaryPartitionPath)
+    binaryChunk = ArrayToBinary(arrayChunk, yOffSet)
+    with open(binaryPartitionPath, 'wb') as fileout:
+        fileout.write(binaryChunk.ravel().tobytes())
 
 def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False):
     "This function conducts zonal stats in SciDB"
@@ -347,26 +378,78 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, binaryLoadPath, tempRastName, ulY, ulX, lrY, lrX, verbose)
 
         elif statsMode == 4:
-            binaryPath = '/home/scidb/scidb_data/0'
-            #WriteMultiDimensionalArray(rasterizedArray, csvPath)
-            #tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
-            #testArray = [ [1,2,3,3], [3,4,2,1] , [3,4,2,1], [3,1,3,1]]
-            #dataset.ravel().tobytes()
+            #This is the serial version
+            print("Serial Version of Zonal Stats")
+            binaryPath = '/home/scidb/scidb_data/0' #/storage/0/0
+            print("Converting to Binary")
             tempRastName = 'p_zones'
-            chunkedArrays = np.array_split(ArrayToBinary(rasterizedArray), 4)
-            print("Partitioning data")
-            for p, chunk in enumerate(chunkedArrays):
-                binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, p)
-                with open(binaryPartitionPath, 'wb') as fileout:
-                    fileout.write(chunk.ravel().tobytes())
+            start = timeit.default_timer()
+            binaryArray = ArrayToBinary(rasterizedArray)
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))
 
-            binaryLoadPath = binaryPartitionPath.split("/")[-1]
+            print("Writing Binary File")
+            start = timeit.default_timer()
+            binaryLoadPath = "%s/p_zones.scidb" % (binaryPath)
+            with open(binaryLoadPath, 'wb') as fileout:
+                fileout.write(binaryArray.ravel().tobytes())
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))    
+            
+            print("Loading 1D File")
+            start = timeit.default_timer()
+            #binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/0'  #binaryPartitionPath.split("/")[-1]
             LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
-
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))    
+            
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
                 
+        elif statsMode == 5:
+            #This is the full parallel mode
+            print("Parallel Version of Zonal Stats")
+            
+            tempRastName = 'p_zones'
+            binaryPath = '/home/scidb/scidb_data/0' #/storage
+            SciDBInstances = 4
+            
+            pool = mp.Pool(SciDBInstances)
 
-        
+            print("Partitioning Array")
+            start = timeit.default_timer()
+
+            chunkedArrays = np.array_split(rasterizedArray, SciDBInstances, axis=0)
+
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))
+
+            #This is super ugly, but I can't think of the one liner!
+            allColumns = [c.shape[0] for c in chunkedArrays]
+            yOffSet = [0]
+            z = 0
+            for c in allColumns:
+                z += c
+                yOffSet.append(z)
+            #Remove the last item 
+            yOffSet.pop()
+
+            print("Converting to Binary and Writing Files in Parallel")
+            start = timeit.default_timer()
+            results = pool.imap(ParallelProcessing, zip( itertools.repeat(binaryPath), itertools.cycle(yOffSet), ((p, chunk) for p, chunk in enumerate(chunkedArrays))  )    )
+            pool.close()
+            pool.join()
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))            
+            
+            print("Loading...")
+            start = timeit.default_timer()
+            binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0'  #binaryPartitionPath.split("/")[-1]
+            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))
+            
+            transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
+
         print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t+1 ))
         if verbose: print("TransferTime: %s" % (transferTime)  )
         outDictionary[theTest] = OrderedDict( [ ("test",theTest), ("SciDBArrayName",SciDBArray), ("BoundaryFilePath",boundaryPath), ("transfer_time",transferTime), ("rasterization_time",rasterizeTime), ("query_time",queryTime), ("total_time",transferTime+rasterizeTime+queryTime) ] )
