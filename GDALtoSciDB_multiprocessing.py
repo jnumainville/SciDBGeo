@@ -16,16 +16,14 @@ class RasterReader(object):
         Initialize the class RasterReader
         """
         self.width, self.height, self.datatype = self.GetRasterDimensions(RasterPath)
-        print("chunk", chunksize)
         self.RasterMetadata = self.CreateArrayMetadata(scidbArray, self.width, self.height, chunksize, tiles, attribute)
-        
         self.CreateDestinationArray(scidbHost, scidbArray, attribute, self.datatype, self.height, self.width, chunksize)
 
 
-    def GetMetadata(self, scidbInstances,rasterFilePath, outPath, loadPath, host):
+    def GetMetadata(self, scidbInstances, rasterFilePath, outPath, loadPath, host):
 
         """
-        Iterator for the class
+        Generator for the class
         Input: 
         scidbInstance = SciDB Instance IDs
         rasterFilePath = Absolute Path to the GeoTiff
@@ -117,10 +115,10 @@ class RasterReader(object):
             #print(DictionaryKeys)
         return RasterReads
 
-def GlobalRasterLoading(theSHIM, theMetadata):
+def GlobalRasterLoading(theSHIM, theMetadata, theDict):
     """
     This function is built in an effort to separate the redimensioning from the loading.
-    I think redimensioning affects the performance of the load
+    I think redimensioning affects the performance of the load if they run concurrently
     """
 
     if theSHIM == "NoSHIM":
@@ -153,7 +151,12 @@ def GlobalRasterLoading(theSHIM, theMetadata):
                         sdb.query("remove_versions(%s, %s)" % (theData[theKey]['scidbArray'], v) )
                     except:
                         print("Couldn't remove version %s from array %s" % (v, theData[theKey]['scidbArray']) )
+        
+        #Add the redimension time to the TimeDictionary
+        #timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2] }
+        theDict[ str(theData[theKey]['version']) ]['redimensionTime'] = redimensionTime
 
+    return theDict
 # @profile
 def GDALReader(inParams):
     """
@@ -228,8 +231,8 @@ def GDALReader(inParams):
         
         # RemoveTempArray(sdb, tempArray)
         # print("Loaded version %s of %s" % (theMetadata['version'], theMetadata["Loops"] ))
-        # dataLoadingTime = ((writeTime + loadTime + redimensionTime) * theMetadata["Loops"]) / 60 
-        # if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s, RedimensionTime: %s" % ( dataLoadingTime, writeTime, loadTime, redimensionTime))
+        dataLoadingTime = ((writeTime + loadTime) * theMetadata["Loops"]) / 60 
+        if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s" % ( dataLoadingTime, writeTime, loadTime))
         # if theMetadata['version'] > 1: 
         #     #sdb.query("remove_versions(%s, %s)" % (theMetadata['scidbArray'], theMetadata['version']))
         #     versions = sdb.versions(theMetadata['scidbArray'])
@@ -348,7 +351,7 @@ def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, xOffSet, yOffSet):
         print(query)
 
 
-def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, csvPath=None):
+def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     """
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
@@ -366,8 +369,8 @@ def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOut
         #print(results, dir(results))
         timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2] } for i in results}
 
-        if csvPath:
-            WriteFile(csvPath, timeDictionary)
+        return timeDictionary
+        
 
     else:
         pool.map_async(GDALReader, itertools.izip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses),  ( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
@@ -383,15 +386,15 @@ def argument_parser():
     import argparse
 
     parser = argparse.ArgumentParser(description= "multiprocessing module for loading GDAL read data into SciDB with multiple instances")    
-    parser.add_argument("-Instances", required =True, nargs='*', type=int, help="Number of SciDB Instances for parallel data loading", dest="instances")    
+    parser.add_argument("-Instances", required =True, nargs='*', type=int, help="Number of SciDB Instances for parallel data loading", dest="instances", default=0)    
     parser.add_argument("-Host", required =True, help="SciDB host for connection", dest="host", default="localhost")
     #If host = NoSHIM, then use the cmd iquery   
     parser.add_argument("-RasterPath", required =True, help="Input file path for the raster", dest="rasterPath")    
     parser.add_argument("-SciDBArray", required =True, help="Name of the destination array", dest="rasterName")
-    parser.add_argument("-AttributeNames", required =True, help="Name of the destination array", dest="attributes", default="value")
+    parser.add_argument("-AttributeNames", required =True, help="Name of the attribute(s) for the destination array", dest="attributes", default="value")
     parser.add_argument("-Tiles", required =False, type=int, help="Size in rows of the read window, default: 1", dest="tiles", default=1)
     parser.add_argument("-Chunk", required =False, type=int, help="Chunk size for the destination array, default: 1,000", dest="chunk", default=1000)
-    parser.add_argument("-Overlap", required =False, type=int, help="Chunk overlap size. Adding overlap increases data loading time. defalt: 0", dest="overlap", default=0)
+    parser.add_argument("-Overlap", required =False, type=int, help="Chunk overlap size. Adding overlap increases data loading time. default: 0", dest="overlap", default=0)
     parser.add_argument("-TempOut", required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath',)
     parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
     parser.add_argument("-CSV", required =False, help="Create CSV file", dest="csv", default="None")
@@ -405,9 +408,13 @@ if __name__ == '__main__':
     args = argument_parser().parse_args()
     start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
-    #WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
-    main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath, args.csv)
-    GlobalRasterLoading(args.host, RasterInformation)
+
+    WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
+    timeDictionary = main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
+    allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
+
+    if args.csv:
+        WriteFile(args.csv, allTimesDictionary)
 
     stop = timeit.default_timer()
     print("Finished. Time to complete %s minutes" % ((stop-start)/60))
