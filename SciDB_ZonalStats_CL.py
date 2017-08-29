@@ -128,6 +128,7 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     queryTime = stop-start
+    sdb.queryResults(sdbquery, "/media/sf_scidb/%s_states2.csv" % (SciDBArray) )
     if verbose: print(sdbquery, queryTime)
 
     return insertTime, queryTime
@@ -299,8 +300,7 @@ def ParallelProcessing(params):
     """
     This function wraps around the ArrayToBinary and WriteBinaryFile and 
     """
-    #print("In Parallel Processing")
-    #print(params)
+
     binaryPath = params[0]
     yOffSet = params[1]
     #print(yOffSet)
@@ -308,9 +308,10 @@ def ParallelProcessing(params):
 
     binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
     #print(binaryPartitionPath)
-    binaryChunk = ArrayToBinary(arrayChunk, yOffSet)
+    
     with open(binaryPartitionPath, 'wb') as fileout:
-        fileout.write(binaryChunk.ravel().tobytes())
+        fileout.write(ArrayToBinary(arrayChunk, yOffSet).ravel().tobytes())
+        print(binaryPartitionPath)
 
 def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False):
     "This function conducts zonal stats in SciDB"
@@ -343,6 +344,9 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             print("Rasterized Array columns:%s, rows: %s" % (rasterizedArray.shape[0], rasterizedArray.shape[1]))
             print("Dimension 1 = Y ulY:%s to lrY:%s " % ( ulY, lrY))
             print("Dimension 2 = X ulX:%s to lrX:%s " % ( ulX, lrX))
+            print("Number of pixels: %s" % ( format( rasterizedArray.shape[0]*rasterizedArray.shape[1], ',d')) )
+
+            
 
         if statsMode == 1:
             #Transfering Raster Array to SciDB
@@ -380,9 +384,9 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
         elif statsMode == 4:
             #This is the serial version
             print("Serial Version of Zonal Stats")
-            binaryPath = '/home/scidb/scidb_data/0' #/storage/0/0
+            binaryPath = '/home/scidb/scidb_data/0' #/storage/0
             print("Converting to Binary")
-            tempRastName = 'p_zones'
+            tempRastName = 's_zones'
             start = timeit.default_timer()
             binaryArray = ArrayToBinary(rasterizedArray)
             stop = timeit.default_timer()
@@ -390,9 +394,10 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
             print("Writing Binary File")
             start = timeit.default_timer()
-            binaryLoadPath = "%s/p_zones.scidb" % (binaryPath)
+            binaryLoadPath = "%s/s_zones.scidb" % (binaryPath)
             with open(binaryLoadPath, 'wb') as fileout:
                 fileout.write(binaryArray.ravel().tobytes())
+                print(binaryLoadPath)
             stop = timeit.default_timer()
             print("Took: %s" % (stop-start))    
             
@@ -417,9 +422,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
             print("Partitioning Array")
             start = timeit.default_timer()
-
             chunkedArrays = np.array_split(rasterizedArray, SciDBInstances, axis=0)
-
             stop = timeit.default_timer()
             print("Took: %s" % (stop-start))
 
@@ -444,14 +447,14 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             print("Loading...")
             start = timeit.default_timer()
             binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0'  #binaryPartitionPath.split("/")[-1]
-            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
+            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
             stop = timeit.default_timer()
             print("Took: %s" % (stop-start))
             
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
 
         print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t+1 ))
-        if verbose: print("TransferTime: %s" % (transferTime)  )
+        if verbose: print("Redimension Time: %s" % (transferTime)  )
         outDictionary[theTest] = OrderedDict( [ ("test",theTest), ("SciDBArrayName",SciDBArray), ("BoundaryFilePath",boundaryPath), ("transfer_time",transferTime), ("rasterization_time",rasterizeTime), ("query_time",queryTime), ("total_time",transferTime+rasterizeTime+queryTime) ] )
     
 
@@ -477,7 +480,11 @@ def argument_parser():
     parser.add_argument('-Mode', help="This allows you to choose the mode of analysis you want to conduct", type=int, default=1, required=True, dest='mode')
     parser.add_argument('-CSV', required=False, dest='CSV')
     parser.add_argument('-v', required=False, action="store_true", default=False, dest='verbose')
-    parser.add_argument('-Host', required=False, help="SciDB host for connection", dest="host", default="http://localhost:8080")        
+    parser.add_argument('-Host', required=False, help="SciDB host for connection", dest="host", default="http://localhost:8080")     
+
+    # group = parser.add_mutually_exclusive_group()
+    # group.add_argument("-v", "--verbose", action="store_true")
+    # group.add_argument("-q", "--quiet", action="store_true")   
     return parser
 
 if __name__ == '__main__':
