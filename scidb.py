@@ -24,21 +24,27 @@ class iquery(object):
         return out
 
     def queryResults(self, theQuery, thePath):
-        import os
+        import os, csv
         
-        with open(thePath, 'w'):
-            os.chmod(thePath, 0o777)
+        # with open(thePath, 'w'):
+        #     os.chmod(thePath, 0o777)
 
-        scidbArguments = ["iquery"]
-        scidbArguments.append( "-aq %s" % (theQuery))
-        scidbArguments.append( "-o CSV")
-        scidbArguments.append( "-r %s" % (thePath))
+        scidbArguments = """iquery -aq "%s;" -o CSV -r %s""" % (theQuery, thePath)
+        # scidbArguments.append( "-aq %s" % (theQuery))
+        # scidbArguments.append( "-o CSV")
+        # scidbArguments.append( "-r %s" % (thePath))
         
-        print(scidbArguments)
+        #print(scidbArguments)
         p = self.subprocess.Popen(scidbArguments, shell=True)
+        with open(thePath) as infile:
+            data = csv.reader(infile)
+            #min(value), max(value), avg(value), count(value)
+            print("geoid, min, max, average, count")
+            for d in data:
+                print(d)
         #print(p.communicate)
         del p
-        return 
+        
 
     def queryAFL(self, theQuery):
         scidbArguments = """iquery -aq "%s";""" % (theQuery)
