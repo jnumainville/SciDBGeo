@@ -355,8 +355,13 @@ def main(pyVersion, Rasters, SciDBHost, rasterFilePath, SciDBOutPath, SciDBLoadP
     """
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
+    import scidb
+    sdb = scidb.iquery()
+
     query = sdb.queryAFL("list('instances')")
-    SciDBInstances = list( range(len(query.splitlines())) )
+    #There is a header?
+    SciDBInstances = len(query.splitlines())-1
+    SciDBInstances = list( range(SciDBInstances ) )
     #pool = ProcessingPool(len(SciDBInstances))  #Pathos module
     pool = mp.Pool(len(query.splitlines()), maxtasksperchild=1)    #Multiprocessing module
 
@@ -410,7 +415,7 @@ if __name__ == '__main__':
     start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
 
-    WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
+    #WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
     timeDictionary = main(pythonVersion, RasterInformation, args.host, args.rasterPath, args.OutPath, args.SciDBLoadPath)
     allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
 

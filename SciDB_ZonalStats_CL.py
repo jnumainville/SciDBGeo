@@ -413,10 +413,13 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
         elif statsMode == 5:
             #This is the full parallel mode
             print("Parallel Version of Zonal Stats")
-            
+            import scidb
+            sdb = scidb.iquery()
+            query = sdb.queryAFL("list('instances')")
+            SciDBInstances = len(query.splitlines())-1
+
             tempRastName = 'p_zones'
-            binaryPath = '/home/scidb/scidb_data/0' #/storage
-            SciDBInstances = 4
+            binaryPath = '/storage' #'/home/scidb/scidb_data/0'
             
             pool = mp.Pool(SciDBInstances)
 
