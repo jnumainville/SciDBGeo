@@ -351,13 +351,14 @@ def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, xOffSet, yOffSet):
         print(query)
 
 
-def main(pyVersion, Rasters, SciDBHost, SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath):
+def main(pyVersion, Rasters, SciDBHost, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     """
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
-    
+    query = sdb.queryAFL("list('instances')")
+    SciDBInstances = list( range(len(query.splitlines())) )
     #pool = ProcessingPool(len(SciDBInstances))  #Pathos module
-    pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)    #Multiprocessing module
+    pool = mp.Pool(len(query.splitlines()), maxtasksperchild=1)    #Multiprocessing module
 
     if pyVersion[0] > 2:
         try:
@@ -386,7 +387,7 @@ def argument_parser():
     import argparse
 
     parser = argparse.ArgumentParser(description= "multiprocessing module for loading GDAL read data into SciDB with multiple instances")    
-    parser.add_argument("-Instances", required =True, nargs='*', type=int, help="Number of SciDB Instances for parallel data loading", dest="instances", default=0)    
+    #parser.add_argument("-Instances", required =True, nargs='*', type=int, help="Number of SciDB Instances for parallel data loading", dest="instances", default=0)    
     parser.add_argument("-Host", required =True, help="SciDB host for connection", dest="host", default="localhost")
     #If host = NoSHIM, then use the cmd iquery   
     parser.add_argument("-RasterPath", required =True, help="Input file path for the raster", dest="rasterPath")    
@@ -410,7 +411,7 @@ if __name__ == '__main__':
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
 
     WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
-    timeDictionary = main(pythonVersion, RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
+    timeDictionary = main(pythonVersion, RasterInformation, args.host, args.rasterPath, args.OutPath, args.SciDBLoadPath)
     allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
 
     if args.csv:
