@@ -116,7 +116,7 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     
     #Write the array in the correct location
     start = timeit.default_timer()
-    sdbquery ="insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format( A=tempRastName, B=tempArray, yOffSet=minY, xOffSet=minX)
+    sdbquery ="insert(faster_redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format( A=tempRastName, B=tempArray, yOffSet=minY, xOffSet=minX)
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     insertTime = stop-start
@@ -128,8 +128,10 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     queryTime = stop-start
-    sdb.queryResults(sdbquery, "/media/sf_scidb/%s_states2.csv" % (SciDBArray) )
+    sdb.queryResults(sdbquery, r"/home/04489/dhaynes/%s_states2.csv" % (SciDBArray) )
     if verbose: print(sdbquery, queryTime)
+    sdb.query("remove(%s)" % tempArray)
+    sdb.query("remove(%s)" % tempRastName)
 
     return insertTime, queryTime
 
