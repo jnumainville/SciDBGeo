@@ -89,22 +89,29 @@ class RasterReader(object):
         for y_version, yOffSet in enumerate(range(0, height, chunk)):
             #Adding +y_version will stagger the offset
             rowsRemaining = height - (y_version*chunk + y_version)
-
-            #If this is not a short read, then read the correct size.
-            if rowsRemaining > chunk: rowsRemaining = chunk
             
-            for x_version, xOffSet in enumerate(range(0, width, chunk*tiles)):
-                version_num = rowMax+x_version
-                #Adding +x_version will stagger the offset
-                columnsRemaining = width - (x_version*chunk*tiles + x_version)
-                
-                #If this is not a short read, then read the correct size.
-                if columnsRemaining > chunk*tiles : columnsRemaining = chunk*tiles
+            #Found cases where the loop continues when the rowsRemaining becomes negative.
+            if rowsRemaining > 0:
 
-                #print(rowsRemaining, columnsRemaining, version_num, x_version,y_version,)
-                RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet+x_version), ("yOffSet",yOffSet+y_version), \
-                    ("xWindow", columnsRemaining), ("yWindow", rowsRemaining), ("version", version_num), \
-                    ("attribute", attribute), ("scidbArray", theArray), ("y_version", y_version), ("chunk", chunk) ])
+                #If this is not a short read, then read the correct size.
+                if rowsRemaining > chunk: rowsRemaining = chunk
+            
+                for x_version, xOffSet in enumerate(range(0, width, chunk*tiles)):
+                               
+                    version_num = rowMax+x_version
+                    #Adding +x_version will stagger the offset
+                    columnsRemaining = width - (x_version*chunk*tiles + x_version)
+
+                    #rowsRemaining applies to columns as well
+                    if columnsRemaining > 0:
+                
+                        #If this is not a short read, then read the correct size.
+                        if columnsRemaining > chunk*tiles : columnsRemaining = chunk*tiles
+
+                        #print(rowsRemaining, columnsRemaining, version_num, x_version,y_version,)
+                        RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet+x_version), ("yOffSet",yOffSet+y_version), \
+                        ("version", version_num),("xWindow", columnsRemaining), ("yWindow", rowsRemaining), \
+                        ("attribute", attribute), ("scidbArray", theArray), ("y_version", y_version), ("chunk", chunk) ])
 
             
             rowMax += math.ceil(width/(chunk*tiles))
@@ -157,11 +164,11 @@ def GlobalRasterLoading(theSHIM, theMetadata, theDict):
         theDict[ str(theData[theKey]['version']) ]['redimensionTime'] = redimensionTime
 
     return theDict
-# @profile
+
 def GDALReader(inParams):
     """
-    This is the main worker function, but I need to split it up
-    """
+    This is the main worker function. It is split between loading and redimensioning.
+   """
 
     theMetadata = inParams[0]
     theInstance = inParams[1]
@@ -180,12 +187,6 @@ def GDALReader(inParams):
 
     #print(theMetadata, theInstance, theRasterPath)
     
-    # # yWindow, base, width, datatype, n = inParams[2]
-    # # #print("multiprocessing")
-
-    # # current = mp.current_process()
-    # # SciDBInstance = AssignSciDBInstance(current._identity[0], numProcesses )
-
     raster = gdal.Open(theRasterPath, GA_ReadOnly)
     array = raster.ReadAsArray(xoff=theMetadata['xOffSet'], yoff=theMetadata['yOffSet'], xsize=theMetadata['xWindow'], ysize=theMetadata['yWindow'])
     rasterValueDataType = array.dtype
@@ -195,27 +196,10 @@ def GDALReader(inParams):
     rasterBinaryLoadPath = "%s/%s.sdbbin" % (theSciDBLoadPath, tempArray)
     
     start = timeit.default_timer()
-    #WriteMultiDimensionalArray(array, rasterBinaryFilePath)
-    #print(rasterBinaryFilePath)
     WriteArray(array, rasterBinaryFilePath)
     stop = timeit.default_timer()
     writeTime = stop-start
-    #del raster, array
-    #print(theMetadata['version'], writeTime) #locals())
-
-    ### Used to evaluate the amount of memory used ####    
-    # if theMetadata['version'] == 0:
-    #     totalMemory = sum([sys.getsizeof(k) for k in locals().keys()])/10**6
-    #     print("Total Memory used: %s" % (totalMemory ))
-
-    # ### Would be a good diagnostic tool if I could get an estimate on writing time
-    # if writeTime > 2:     
-    #     # for k in locals().keys():
-    #     #     print("Object name: %s, size of object: %s" % (k, sys.getsizeof(k) ))
-    #     totalMemory = sum([sys.getsizeof(k) for k in locals().keys()])/10**6
-    #     print("Total Memory used: %s" % (totalMemory) )
-    # return (theMetadata['version'], writeTime, -999, -999)
-
+    
     os.chmod(rasterBinaryFilePath, 0o755)
     CreateLoadArray(sdb, tempArray, theMetadata['attribute'], rasterValueDataType)
     start = timeit.default_timer()
@@ -362,7 +346,6 @@ def main(pyVersion, Rasters, SciDBHost, rasterFilePath, SciDBOutPath, SciDBLoadP
     #There is a header?
     SciDBInstances = len(query.splitlines())-1
     SciDBInstances = list( range(SciDBInstances ) )
-    #pool = ProcessingPool(len(SciDBInstances))  #Pathos module
     pool = mp.Pool(len(query.splitlines()), maxtasksperchild=1)    #Multiprocessing module
 
     if pyVersion[0] > 2:
@@ -370,12 +353,12 @@ def main(pyVersion, Rasters, SciDBHost, rasterFilePath, SciDBOutPath, SciDBLoadP
             results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost)  ))
         except:
             print(multiprocessing.get_logger())
-        #pool.map_async(GDALReader, zip(itertools.repeat(rasterFilePath), itertools.repeat(numProcesses), 
-        #( (arrayReadSettings[r]["ReadWindow"], arrayReadSettings[r]["Base"], arrayReadSettings[r]["Width"], arrayReadSettings[r]["DataType"], r) for r in arrayReadSettings)   )  )
-        #print(results, dir(results))
-        timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2] } for i in results}
+         
+        if results:
+            print(results, dir(results))
+            timeDictionary  = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2] } for i in results}
 
-        return timeDictionary
+            return timeDictionary
         
 
     else:
@@ -414,17 +397,15 @@ if __name__ == '__main__':
     args = argument_parser().parse_args()
     start = timeit.default_timer()
     RasterInformation = RasterReader(args.rasterPath, args.host, args.rasterName, args.attributes, args.chunk, args.tiles)
-
-    #WriteFile("/media/sf_scidb/glc_raster_reads6.csv", RasterInformation.RasterMetadata)
+    ## Debugger to see what the metadata for SciDB loading.
+    #WriteFile("/home/04489/dhaynes/treecover_reads22.csv", RasterInformation.RasterMetadata)
+    
     timeDictionary = main(pythonVersion, RasterInformation, args.host, args.rasterPath, args.OutPath, args.SciDBLoadPath)
     allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
 
-    if args.csv:
-        WriteFile(args.csv, allTimesDictionary)
+    if args.csv: WriteFile(args.csv, allTimesDictionary)
 
     stop = timeit.default_timer()
     print("Finished. Time to complete %s minutes" % ((stop-start)/60))
-    # for r in RasterInformation.GetMetadata(args.instances, args.rasterPath,args.OutPath, args.SciDBLoadPath, args.host):
-    #     print(r)
-
+    
    
