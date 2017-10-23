@@ -106,3 +106,34 @@ class iquery(object):
             print(resultsList)
         
         return versions
+
+
+    def list(self, item='arrays'):
+        """
+        Method for returning the list of arrays, could be easily used for other
+        """
+
+        scidbArguments = """iquery -aq "list('%s')"; """ % (item)
+        
+        p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
+        p.wait()
+        out, err = p.communicate()
+
+        #print("OUT", out)
+        #results = out.decode("utf-8")
+        resultsList = out.decode("utf-8").split("\n")
+        arrayNames = []
+        #{No} name,uaid,aid,schema,availability,temporary
+        #{0} 'glc_1000',7227,7227,'glc_1000<value:uint8> [y=0:16352:0:1000; x=0:40319:0:1000]',true,false
+        
+        try:
+            for r in resultsList[1:]:
+                if len(r) > 1:
+                    positionArrayName, uaid, aid,schema,availability,temporary = r.split(",")
+                    position, name = positionArrayName.split(" ")
+                    name = name.replace("'", "")
+                    arrayNames.append(name)
+        except:
+            print(resultsList)
+        
+        return arrayNames
