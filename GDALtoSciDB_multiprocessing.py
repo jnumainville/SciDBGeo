@@ -160,25 +160,18 @@ class RasterReader(object):
 
 
 
-def GlobalRasterLoading(theSHIM, theMetadata, theDict):
+def GlobalRasterLoading(sdb, theMetadata, theDict):
     """
     This function is built in an effort to separate the redimensioning from the loading.
     I think redimensioning affects the performance of the load if they run concurrently
     """
 
-    if theSHIM == "NoSHIM":
-        import scidb
-        sdb = scidb.iquery()
-    else:
-        from scidbpy import connect  
-        #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
-        sdb = connect(theSHIM)
 
     theData = theMetadata.RasterMetadata
     for theKey in theMetadata.RasterMetadata.keys():
         start = timeit.default_timer()
         tempArray = "temprast_%s" % (theData[theKey]['version'])
-        RedimensionAndInsertArray(sdb, tempArray, theData[theKey]['scidbArray'], theData[theKey]['xOffSet'], theData[theKey]['yOffSet'])    
+        RedimensionAndInsertArray(sdb, tempArray, theData[theKey]['scidbArray'], theData[theKey]['array_type'], theData[theKey]['xOffSet'], theData[theKey]['yOffSet'])    
         stop = timeit.default_timer()
         redimensionTime = stop-start
         
@@ -250,7 +243,7 @@ def GDALReader(inParams):
         
     os.chmod(rasterBinaryFilePath, 0o755)
     #This needs to be changed so that it can support att1:val, att2:val, att3:val  
-    CreateLoadArray(sdb, tempArray, pseudoAttributes, theMetadata['array_type'])
+    CreateLoadArray(sdb, tempArray, theMetadata['attribute'], theMetadata['array_type'])
     start = timeit.default_timer()
         
         
@@ -264,6 +257,9 @@ def GDALReader(inParams):
         #Clean up
         os.remove(rasterBinaryFilePath)
         gc.collect()
+        
+        RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['array_type'], theMetadata['xOffSet'], theMetadata['yOffSet'])
+        
         return (theMetadata['version'], writeTime, loadTime)
 
     else:
@@ -379,7 +375,7 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterAttributes, r
         items = [attribute.split(":")[1].strip() for attribute in rasterAttributes.split(",")  ]
         attributeValueTypes = ", ".join(items)
     else:
-        attributeValueTypes = rasterAttributes
+        attributeValueTypes = rasterAttributes.split(":")[1]
     
     try:
         query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
@@ -391,22 +387,23 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterAttributes, r
         print(query)
         return 0
 
-def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, xOffSet, yOffSet):
+def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, RasterArrayShape, xOffSet, yOffSet):
     """
     Function for redimension and inserting data from the temporary array into the destination array
     """
     
-    if self.RasterArrayShape <= 2:
-        #sdb.query("create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk) )
-        myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
+    if RasterArrayShape <= 2:
+        query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
+        
+        #myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
     else:
-        #sdb.query("create array %s <%s> [band=0:%s,1; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , len(self.datatype)-1, height-1, chunk, width-1, chunk) )
-        myQuery = "create array %s <%s> [band=0:%s,1; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, width-1, chunk)
-            
+        query = "insert(redimension(apply(band, z, %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
+        
+        #myQuery = "create array %s <%s> [band=0:%s,1; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, width-1, chunk)
             
     try:
         #sdb.query("insert(redimension(apply( {A}, y, y1+{yOffSet}, x, x1+{xOffSet} ), {B} ), {B})",A=tempRastName, B=rasterArrayName, yOffSet=RasterMetadata[k]["yOffSet"], xOffSet=RasterMetadata[k]["xOffSet"])    
-        query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
+        #query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
         print(query)
         #sdb.query(query)
     except:
@@ -476,6 +473,7 @@ def argument_parser():
     parser.add_argument("-TempOut", required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath')
     parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
     parser.add_argument("-CSV", required =False, help="Create CSV file", dest="csv", default="None")
+    parser.add_argument("-P", required =False, help="Parallel Redimensioning", dest="parallel", default="None")
 
     return parser
 
@@ -489,7 +487,8 @@ if __name__ == '__main__':
     #WriteFile("/home/04489/dhaynes/treecover_reads22.csv", RasterInformation.RasterMetadata)
     
     timeDictionary = main(RasterInformation, args.host, args.instances, args.rasterPath, args.OutPath, args.SciDBLoadPath)
-#    #allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
+    if not args.parallel:
+        allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
 #
 #    #if args.csv: WriteFile(args.csv, allTimesDictionary)
 #
