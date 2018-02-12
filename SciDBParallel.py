@@ -7,9 +7,9 @@ class ZonalStats(object):
         import scidb
         import numpy as np
         
-        #self.__SciDBInstances()
-
-        self.scidb = scidb.iquery()
+        self.sdb = scidb.iquery()
+        self.__SciDBInstances()
+        
         #self.pool = mp.Pool(2) #self.SciDBInstances)
         self.np = np
 
@@ -17,9 +17,7 @@ class ZonalStats(object):
         self.geoTiffPath = rasterPath
         self.SciDBArrayName = SciDBArray
 
-        
-
-        #self.main(boundaryPath, rasterPath, SciDBArray)
+    
 
     def __SciDBInstances(self,):
         """
@@ -30,12 +28,12 @@ class ZonalStats(object):
         self.SciDBInstances = len(query.splitlines())-1
 
 
-    def main(self,boundaryPath, rasterPath, SciDBArray):
+    def SerialRasterization(self,boundaryPath, rasterPath, SciDBArray, storagePath):
         """
 
         """
         self.tempRastName = 'p_zones'
-        self.binaryPath = r'c:\work' #'/storage' #'/home/scidb/scidb_data/0'
+        self.binaryPath = r'%s' % (storagePath) #'/storage' #'/home/scidb/scidb_data/0'
         self.RasterArray = self.RasterizePolygon(rasterPath, boundaryPath)
         #self.ParallelRasterization(rasterPath, boundaryPath, 2)
 
@@ -136,6 +134,9 @@ class ZonalStats(object):
         from SciDBGDAL import world2Pixel, Pixel2world
         #The array size, sets the raster size 
         inRaster = gdal.Open(inRasterPath)
+        rArray = inRaster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)
+        self.rasterValueDataType = rArray[0][0].dtype
+
         rasterTransform = inRaster.GetGeoTransform()
         rasterProjection = inRaster.GetProjection()
         pixel_size = rasterTransform[1]
@@ -219,24 +220,16 @@ class ZonalStats(object):
         
         # transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
 
-    def CreateMask(self):
+    def CreateMask(self, tempArray='mask'):
         """
-        SciDB Summary Stats
-        1. Make an empty raster "Mask "that matches the SciDBArray
+        Create an empty raster "Mask "that matches the SciDBArray
         """
 
         import re    
         tempArray = "mask"
 
-        #afl = sdb.afl
-        #theArray = afl.show(SciDBArray)
-        #results = theArray.contents()
-
-        results = self.sdb.queryAFL("show(%s)" % (SciDBArray))
+        results = self.sdb.queryAFL("show(%s)" % (self.SciDBArrayName))
         results = results.decode("utf-8")
-        #print(results)
-        #SciDBArray()\n[('polygon<x:int64,y:int64,id:int16> [xy=0:*:0:1000000]')]\n
-        #[('GLC2000<value:uint8> [x=0:40319:0:100000; y=0:16352:0:100000]')]
 
         #R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>\S+)(\])')
         R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>[^\]]+)')
@@ -252,12 +245,12 @@ class ZonalStats(object):
           raise 
 
         try:
-          sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
+          sdbquery = r"create array %s <id:%s> %s" % (tempArray, self.rasterValueDataType, dimensions)
           self.sdb.query(sdbquery)
         except:
           print(sdbquery)
           self.sdb.query("remove(%s)" % tempArray)
-          sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
+          sdbquery = r"create array %s <id:%s> %s" % (tempArray, self.rasterValueDataType, dimensions)
           self.sdb.query(sdbquery)
 
     def GlobalJoin_SummaryStats(self, SciDBArray, rasterValueDataType, tempSciDBLoad, tempRastName, minY, minX, maxY, maxX, verbose=False):
@@ -284,38 +277,7 @@ class ZonalStats(object):
 
         return insertTime, queryTime
 
-    # def world2Pixel(self, geoMatrix, x, y):
-    #     """
-    #     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
-    #     the pixel location of a geospatial 
-    #     """
-    #     ulX = geoMatrix[0]
-    #     ulY = geoMatrix[3]
-    #     xDist = geoMatrix[1]
-    #     yDist = geoMatrix[5]
-    #     rtnX = geoMatrix[2]
-    #     rtnY = geoMatrix[4]
-    #     pixel = int((x - ulX) / xDist)
-    #     line = int((ulY - y) / xDist)
-        
-    #     return (pixel, line)
-    
-    # def Pixel2world(self, geoMatrix, row, col):
-    #     """
-    #     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
-    #     the x,y location of a pixel location
-    #     """
 
-    #     ulX = geoMatrix[0]
-    #     ulY = geoMatrix[3]
-    #     xDist = geoMatrix[1]
-    #     yDist = geoMatrix[5]
-    #     rtnX = geoMatrix[2]
-    #     rtnY = geoMatrix[4]
-    #     x_coord = (ulX + (row * xDist))
-    #     y_coord = (ulY - (col * xDist))
-
-    #     return (x_coord, y_coord)
 def ParamSeperator(inParams):
 
     x = inParams[0]
@@ -361,7 +323,7 @@ def Rasterization(inParams):
     bandArray = band.ReadAsArray()
     del theRast
 
-    binaryPartitionPath = "%s\%s\p_zones.scidb" % (dataStorePath, counter)
+    binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
     ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)    
     
     return counter, offset, bandArray, binaryPartitionPath

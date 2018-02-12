@@ -137,3 +137,53 @@ class iquery(object):
             print(resultsList)
         
         return arrayNames
+
+class statements(object):
+
+    def __init__(self,sdb):
+        """
+        Must supply the sdb connection
+        """
+        self.sdb  = sdb
+
+
+    def CreateLoadArray(self, tempRastName, attribute_name, rasterArrayType):
+        """
+        Create the loading array
+        """
+                
+        if rasterArrayType <= 2:
+            theQuery = "create array %s <y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
+        elif rasterArrayType == 3:
+            theQuery = "create array %s <z1:int64, y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
+        
+        try:
+            #print(theQuery)
+            self.sdb.query(theQuery)
+            self.sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name, rasterValueDataType) )
+        except:
+            #Silently deleting temp arrays
+            self.sdb.query("remove(%s)" % (tempRastName))
+            self.sdb.query(theQuery)
+            #sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name,rasterValueDataType) )    
+
+    def LoadOneDimensionalArray(self, sdb_instance, tempRastName, rasterAttributes, rasterType, binaryLoadPath):
+        """
+        Function for loading GDAL data into a single dimension
+        """
+        
+        if rasterType == 2:                
+            items = [attribute.split(":")[1].strip() for attribute in rasterAttributes.split(",")  ]
+            attributeValueTypes = ", ".join(items)
+        else:
+            attributeValueTypes = rasterAttributes.split(":")[1]
+        
+        try:
+            query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
+            #print(query)
+            self.sdb.query(query)
+            return 1
+        except:
+            print("Error Loading DimensionalArray")
+            print(query)
+            return 0
