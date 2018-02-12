@@ -101,7 +101,7 @@ class RasterReader(object):
             myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
         else:
             #sdb.query("create array %s <%s> [band=0:%s,1; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , len(self.datatype)-1, height-1, chunk, width-1, chunk) )
-            myQuery = "create array %s <%s> [band=0:%s,1; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, width-1, chunk)
+            myQuery = "create array %s <%s> [band=0:%s,1,0; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, width-1, chunk)
         
         try:
             #print(myQuery)
@@ -220,6 +220,7 @@ def GDALReader(inParams):
 
     raster = gdal.Open(theRasterPath, GA_ReadOnly)
     if bandIndex:
+        print("Reading band %s" % (bandIndex))
         band = raster.GetRasterBand(bandIndex)
         array = band.ReadAsArray(xoff=theMetadata['xOffSet'], yoff=theMetadata['yOffSet'], win_xsize=theMetadata['xWindow'], win_ysize=theMetadata['yWindow'])
     else:
@@ -264,7 +265,7 @@ def GDALReader(inParams):
 
     else:
         print("Error Loading")
-        os.remove(rasterBinaryFilePath)
+        #os.remove(rasterBinaryFilePath)
         return (theMetadata['version'], -999, -999)
     
     
@@ -294,26 +295,25 @@ def WriteArray(theArray, binaryFilePath, arrayType, attributeName='value', bandI
         row_index = np.array(np.concatenate([[x for x in range(row)] for i in range(col)]), dtype=np.dtype('int64'))
         
         if arrayType == 3:
-            fileout.close()
-
-        #numbands > 1 and len(attributeName.split(",")) == 1:
+            
+            #numbands > 1 and len(attributeName.split(",")) == 1:
             #Multidimensional array where each band will be a band value
             #Generate the bandID
+            band_index = np.array([bandID for c in column_index])
+
+            # for dim, array in enumerate(np.array_split(theArray, dim, axis=0)):
+            #     print(array.shape)
+                
+            #     planarArray = array.reshape(array.shape[1:]).ravel()
+            #     binaryFilePath = "%s_%s.%s" % (fileName, dim, extension)
+            #     filePaths.append(binaryFilePath)
+            #     print(binaryFilePath)
+            print(band_index.shape, column_index.shape, row_index.shape, theArray.ravel().shape)
+                
+            np.core.records.fromarrays([band_index, column_index, row_index, theArray.ravel()], \
+                dtype=[('band','int64'),('x','int64'),('y','int64'),(attributeName.split(":")[0],theArray.dtype)]).ravel().tofile(binaryFilePath) 
             
-            dim = theArray.shape[0]               
-            fileName, extension = binaryFilePath.split(".")
-            filePaths = []
-            for dim, array in enumerate(np.array_split(theArray, dim, axis=0)):
-                band_index = np.array([dim for c in column_index])
-                planarArray = array.reshape(array.shape[1:]).ravel()
-                binaryFilePath = "%s_%s.%s" % (fileName, dim, extension)
-                filePaths.append(binaryFilePath)
-                print(binaryFilePath)
-                with open(binaryFilePath, 'wb') as fileout:
-                    np.core.records.fromarrays([band_index, column_index, row_index, planarArray.ravel()], \
-                        dtype=[('band','int64'),('x','int64'),('y','int64'),(attributeName.split(":")[0],planarArray.dtype)]).ravel().tofile(binaryFilePath) 
-            
-            return filePaths
+
             
 
         elif arrayType == 2:
@@ -384,14 +384,19 @@ def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterAttributes, r
     Function for loading GDAL data into a single dimension
     """
     
-    if rasterType == 2:                
+    if rasterType == 3:
+        attributeValueTypes = rasterAttributes.split(":")[1]
+        query = "load(%s, '%s' ,%s, '(int64, int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
+
+    elif rasterType == 2:                
         items = [attribute.split(":")[1].strip() for attribute in rasterAttributes.split(",")  ]
         attributeValueTypes = ", ".join(items)
+        query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
     else:
         attributeValueTypes = rasterAttributes.split(":")[1]
-    
-    try:
         query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
+    
+    try:        
         sdb.query(query)
         return 1
     except:
@@ -408,7 +413,7 @@ def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, RasterArrayShape, xOff
         query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
         #query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s, %s , %s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray, oldAttribute, newAttribute)       
         #myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
-    elif rastertyp == 3:
+    elif RasterArrayShape == 3:
         query = "insert(redimension(apply(band, z, %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
 
             
@@ -453,8 +458,8 @@ def MultiProcessLoading(Rasters, SciDBHost, rasterFilePath, SciDBOutPath, SciDBL
         if not Rasters.RasterMetadata[aKey]['iterate']:
             results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost, 0)  ))
         else:
-            for bandNum in range(Rasters.RasterMetadata[aKey]['iterate']):            
-                results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost, bandNum)  ))
+            #for bandNum in range(Rasters.RasterMetadata[aKey]['iterate']):            
+            results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost, 1)  ))
     except:
         print(mp.get_logger())
 
