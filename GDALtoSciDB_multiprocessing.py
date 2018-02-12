@@ -414,7 +414,7 @@ def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, RasterArrayShape, xOff
         #query = "insert(redimension(apply( %s, y, y1+%s, x, x1+%s, %s , %s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray, oldAttribute, newAttribute)       
         #myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
     elif RasterArrayShape == 3:
-        query = "insert(redimension(apply(band, z, %s, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
+        query = "insert(redimension(apply(%s, band, z1, y, y1+%s, x, x1+%s ), %s ), %s)" % (tempArray, yOffSet, xOffSet, SciDBArray, SciDBArray)
 
             
     try:
