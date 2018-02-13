@@ -201,7 +201,7 @@ def GDALReader(inParams):
     This is the main worker function.
     Split up Loading and Redimensioning. Only Loading is multiprocessing
     """
-    print(inParams)
+    #print(inParams)
     theMetadata = inParams[0]
     theInstance = inParams[1]
     theRasterPath = inParams[2]
@@ -209,18 +209,12 @@ def GDALReader(inParams):
     theSciDBLoadPath = inParams[4]
     bandIndex = inParams[6]
 
-
-    if inParams[5] == "NoSHIM":
-        import scidb
-        sdb = scidb.iquery()
-    else:
-        from scidbpy import connect  
-        #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
-        sdb = connect(inParams[5])
+    import scidb
+    sdb = scidb.iquery()
 
     raster = gdal.Open(theRasterPath, GA_ReadOnly)
     if bandIndex:
-        print("Reading band %s" % (bandIndex))
+        print("**** Reading band %s" % (bandIndex))
         band = raster.GetRasterBand(bandIndex)
         array = band.ReadAsArray(xoff=theMetadata['xOffSet'], yoff=theMetadata['yOffSet'], win_xsize=theMetadata['xWindow'], win_ysize=theMetadata['yWindow'])
     else:
@@ -243,7 +237,7 @@ def GDALReader(inParams):
         pseudoAttributes = "%s:%s" % (theMetadata['attribute'].split(":")[0].strip()+"1", theMetadata['attribute'].split(":")[1].strip())
         
     os.chmod(rasterBinaryFilePath, 0o755)
-    #This needs to be changed so that it can support att1:val, att2:val, att3:val  
+    #Support multiple attributes or 2D and 3D arrays
     CreateLoadArray(sdb, tempArray, theMetadata['attribute'], theMetadata['array_type'])
     start = timeit.default_timer()
         
@@ -256,7 +250,7 @@ def GDALReader(inParams):
         if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s" % ( dataLoadingTime, writeTime, loadTime))
 
         #Clean up
-        #os.remove(rasterBinaryFilePath)
+        os.remove(rasterBinaryFilePath)
         gc.collect()
         
         RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['array_type'], theMetadata['xOffSet'], theMetadata['yOffSet'])
@@ -296,25 +290,11 @@ def WriteArray(theArray, binaryFilePath, arrayType, attributeName='value', bandI
         
         if arrayType == 3:
             
-            #numbands > 1 and len(attributeName.split(",")) == 1:
-            #Multidimensional array where each band will be a band value
-            #Generate the bandID
-            band_index = np.array([bandID for c in column_index])
-
-            # for dim, array in enumerate(np.array_split(theArray, dim, axis=0)):
-            #     print(array.shape)
-                
-            #     planarArray = array.reshape(array.shape[1:]).ravel()
-            #     binaryFilePath = "%s_%s.%s" % (fileName, dim, extension)
-            #     filePaths.append(binaryFilePath)
-            #     print(binaryFilePath)
-            print(band_index.shape, column_index.shape, row_index.shape, theArray.ravel().shape)
+            band_index = np.array([bandID-1 for c in column_index])
+            print(bandID, band_index.shape, column_index.shape, row_index.shape, theArray.ravel().shape)
                 
             np.core.records.fromarrays([band_index, column_index, row_index, theArray.ravel()], \
                 dtype=[('band','int64'),('x','int64'),('y','int64'),(attributeName.split(":")[0],theArray.dtype)]).ravel().tofile(binaryFilePath) 
-            
-
-            
 
         elif arrayType == 2:
             #numbands > 1 and attributeName.find(",") == -1:
@@ -324,7 +304,6 @@ def WriteArray(theArray, binaryFilePath, arrayType, attributeName='value', bandI
             for dim, name in enumerate(attributeName.split(",")):
                 attName, attType = name.split(":")
                 attributesList.append( (attName.strip(), attType.strip()) )
-            
             
             #Making a list of numpy arrays
             #z = [ attArray.ravel() for attArray in np.split(theArray, len(attributeName.split(",")), axis=0) ]
@@ -458,8 +437,9 @@ def MultiProcessLoading(Rasters, SciDBHost, rasterFilePath, SciDBOutPath, SciDBL
         if not Rasters.RasterMetadata[aKey]['iterate']:
             results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost, 0)  ))
         else:
-            #for bandNum in range(Rasters.RasterMetadata[aKey]['iterate']):            
-            results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost, 1)  ))
+            for bandNum in range(1, Rasters.RasterMetadata[aKey]['iterate']+1):
+                #Need to filter this
+                results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, SciDBHost, bandNum)  ))
     except:
         print(mp.get_logger())
 
