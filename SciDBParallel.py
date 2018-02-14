@@ -79,51 +79,38 @@ class ZonalStats(object):
 
         return bandArray
 
-
-
-    # def ParallelProcessing(self, params):
-    #     """
-    #     This function wraps around the ArrayToBinary and WriteBinaryFile and 
-    #     """
-
-    #     binaryPath = params[0]
-    #     yOffSet = params[1]
-    #     print(yOffSet)
-    #     datastore, arrayChunk = params[2]
-
-    #     binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
-    #     #print(binaryPartitionPath)
-      
-    #     with open(binaryPartitionPath, 'wb') as fileout:
-    #           fileout.write(ArrayToBinary(arrayChunk, yOffSet).ravel().tobytes())
-    #           print(binaryPartitionPath)
-
-
-    def ArrayToBinary(theArray, yOffSet=0):
+    def WriteRaster(self, inArray, outPath, noDataValue=-999):
         """
-        Use Numpy tricks to write a numpy array in binary format with indices 
 
-        input: Numpy 2D array
-        output: Numpy 2D array in binary format
         """
-        col, row = theArray.shape
-        
-        thecolumns =[y for y in np.arange(0+yOffSet, col+yOffSet)]
-        column_index = np.array(np.repeat(thecolumns, row), dtype=np.dtype('int64'))
-        
-        therows = [x for x in np.arange(row)]
-        allrows = [therows for i in np.arange(col)]
-        row_index = np.array(np.concatenate(allrows), dtype=np.dtype('int64'))
+        from osgeo import ogr, gdal
+        driver = gdal.GetDriverByName('GTiff')
 
-        values = theArray.ravel()
-        vdatatype = theArray.dtype
+        height, width = inArray.shape
 
-        arraydatatypes = 'int64, int64, %s' % (vdatatype)
-        dataset = np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatatypes)
+        pixelType = gdal_array.NumericTypeCodeToGDALTypeCode(inArray.dtype)
+        #https://gist.github.com/CMCDragonkai/ac6289fa84bcc8888035744d7e00e2e6
+        if driver:
+            geoTiff = driver.Create(outPath, width, height, 1, pixelType)
+            geoTiff.SetGeoTransform( (self.x, self.pixel_size, 0, self.y, 0, -self.pixel_size)  )
+            geoTiff.SetProjection(self.projection)
+            band = geoTiff.GetRasterBand(1)
+            band.SetNoDataValue(noDataValue)
 
-        return dataset
-        #return dataset.ravel().tobytes()
+            band.WriteArray(inArray)
+            geoTiff.FlushCache()
 
+        del geoTiff
+
+    def OutputToArray(self, filePath, columnReader):
+        """
+
+        """
+        with open(filpath, 'w') as filein:
+            csv = filein.split('\n')
+            array = [row.split(',')[columnReader] for row in csv ]
+
+        return array
 
 
     def RasterMetadata(self, inRasterPath, vectorPath, instances, dataStorePath):
@@ -134,30 +121,31 @@ class ZonalStats(object):
         from SciDBGDAL import world2Pixel, Pixel2world
         #The array size, sets the raster size 
         inRaster = gdal.Open(inRasterPath)
-        rArray = inRaster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)
-        self.rasterValueDataType = rArray[0][0].dtype
+        # rArray = inRaster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)
+        # self.rasterValueDataType = rArray[0][0].dtype
+        # print(self.rasterValueDataType)
 
         rasterTransform = inRaster.GetGeoTransform()
-        rasterProjection = inRaster.GetProjection()
-        pixel_size = rasterTransform[1]
-        
+        self.rasterProjection = inRaster.GetProjection()
+        self.pixel_size = rasterTransform[1]
+        print(rasterTransform)
         vector_dataset = ogr.Open(vectorPath)
         theLayer = vector_dataset.GetLayer()
         geomMin_X, geomMax_X, geomMin_Y, geomMax_Y = theLayer.GetExtent()
         
-        rasterWidth = int((geomMax_X - geomMin_X) / pixel_size)
+        rasterWidth = int((geomMax_X - geomMin_X) / self.pixel_size)
         
         #TopLeft & lowerRight
-        tlX, tlY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
-        lrX, lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
-        #print(tlY, lrY, geomMin_Y, geomMax_Y)
+        self.tlX, self.tlY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
+        self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
+        print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
         #print("Rows between %s" % (tlY-lrY))
         
-        step = int(abs(tlY-lrY)/instances)
+        step = int(abs(self.tlY-self.lrY)/instances)
         
         self.arrayMetaData = []
-        for c, i in enumerate(range(tlY,lrY,step)):
-            if i+step <= lrY:
+        for c, i in enumerate(range(self.tlY,self.lrY,step)):
+            if i+step <= self.lrY:
                 print("top pixel: %s" % (i+c) )
                 topPixel = i+c
                 height = step
@@ -165,16 +153,14 @@ class ZonalStats(object):
             else:
                 print("top pixel: %s" % (i+c) )
                 topPixel = i+c
-                height = abs(lrY-topPixel)
+                height = abs(self.lrY-topPixel)
             
-            offset = abs(tlY - topPixel)
-            x,y = Pixel2world(rasterTransform, tlX, topPixel)
-            self.arrayMetaData.append((geomMin_X, y, height, rasterWidth, 
-                pixel_size, rasterTransform[5], rasterProjection, 
+            offset = abs(self.tlY - topPixel)
+            self.x,self.y = Pixel2world(rasterTransform, self.tlX, topPixel)
+            self.arrayMetaData.append((geomMin_X, self.y, height, rasterWidth, 
+                self.pixel_size, rasterTransform[5], self.rasterProjection, 
                 vectorPath, c, offset, dataStorePath))
 
-        #print(pixelCoordinates)
-        #return pixelCoordinates
 
 
     def SciDBZonalStats(self,rasterizedArray,  ):
@@ -220,11 +206,11 @@ class ZonalStats(object):
         
         # transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
 
-    def CreateMask(self, tempArray='mask'):
+
+    def CreateMask(self, rasterValueDataType, tempArray='mask'):
         """
         Create an empty raster "Mask "that matches the SciDBArray
         """
-
         import re    
         tempArray = "mask"
 
@@ -236,47 +222,83 @@ class ZonalStats(object):
         results = results.lstrip('results').strip()
         match = R.search(results)
 
+        #This code creates 2d planar mask
+        dim = r'([a-zA-Z0-9]+(=[0-9]:[0-9]+:[0-9]+:[0-9]+))'
+        alldimensions = re.findall(dim, results)
+        thedimensions = [d[0] for d in alldimensions]
+        if len(thedimensions) > 2:
+            dimensions = "; ".join(thedimensions[1:])
+        else:
+            dimensions = "; ".join(thedimensions)
+        
         try:
           A = match.groupdict()
           schema = A['attributes']
-          dimensions = "[%s; %s]" % (A['dim_1'], A['dim_2'])
+          #dimensions = "[%s; %s]" % (A['dim_1'], A['dim_2'])
         except:
           print(results)
           raise 
 
         try:
-          sdbquery = r"create array %s <id:%s> %s" % (tempArray, self.rasterValueDataType, dimensions)
+          sdbquery = r"create array %s <id:%s> [%s]" % (tempArray, rasterValueDataType, dimensions)
           self.sdb.query(sdbquery)
         except:
-          print(sdbquery)
           self.sdb.query("remove(%s)" % tempArray)
-          sdbquery = r"create array %s <id:%s> %s" % (tempArray, self.rasterValueDataType, dimensions)
+          sdbquery = r"create array %s <id:%s> [%s]" % (tempArray, rasterValueDataType, dimensions)
           self.sdb.query(sdbquery)
 
-    def GlobalJoin_SummaryStats(self, SciDBArray, rasterValueDataType, tempSciDBLoad, tempRastName, minY, minX, maxY, maxX, verbose=False):
+        return thedimensions
+
+    def InsertRedimension(self, tempRastName, tempArray, minY, minX):
         """
+        First part inserts the boundary array into larger global mask array
         """
-        #Write the array in the correct location
         start = timeit.default_timer()
-        sdbquery ="insert(faster_redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format( A=tempRastName, B=tempArray, yOffSet=minY, xOffSet=minX)
+        sdbquery ="insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format( A=tempRastName, B=tempArray, yOffSet=minY, xOffSet=minX)
         self.sdb.query(sdbquery)
         stop = timeit.default_timer()
         insertTime = stop-start
-        if verbose: print(sdbquery , insertTime)
 
-      
+        return insertTime
+
+    def GlobalJoin_SummaryStats(self, SciDBArray, tempRastName, tempArray, minY, minX, maxY, maxX, thedimensions, theband=0, csvPath=None):
+        """
+        This is the SciDB Global Join
+        Goins the array and conducts the grouped_aggregate
+        """
+        insertTime = self.InsertRedimension(tempRastName, tempArray, minY, minX)
+
+        dimName = thedimensions[0].split("=")[0]
         start = timeit.default_timer()
-        sdbquery = "grouped_aggregate(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX)
+        if len(thedimensions) > 2:
+            sdbquery = "grouped_aggregate(join(between(slice(%s,%s,%s), %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, dimName,theband, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX)
+        else:
+            sdbquery = "grouped_aggregate(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX)
+        
         self.sdb.query(sdbquery)
         stop = timeit.default_timer()
         queryTime = stop-start
-        self.sdb.queryResults(sdbquery, r"/home/04489/dhaynes/%s_states2.csv" % (SciDBArray) )
-        if verbose: print(sdbquery, queryTime)
-        self.sdb.query("remove(%s)" % tempArray)
-        self.sdb.query("remove(%s)" % tempRastName)
+        if csvPath:
+            self.sdb.queryResults(sdbquery, r"%s" % (csvPath) ) # r"/home/04489/dhaynes/%s_states2.csv"
+        #self.sdb.query("remove(%s)" % tempArray)
+        #self.sdb.query("remove(%s)" % tempRastName)
 
         return insertTime, queryTime
 
+    def JoinReclass(self, SciDBArray, tempRastName, tempArray,  minY, minX, maxY, maxX, thedimensions, reclassText, theband=0):
+        """
+
+        """
+        self.InsertRedimension(tempRastName, tempArray, minY, minX)
+
+        dimName = thedimensions[0].split("=")[0]
+        start = timeit.default_timer()
+        if len(thedimensions) > 2:
+            sdbquery = "apply(join(between(slice(%s, %s, %s), %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), value, %s )" % (SciDBArray, dimName,theband, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
+        else:
+            sdbquery = "apply(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), value, %s)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
+        
+        self.sdb.query(sdbquery)
 
 def ParamSeperator(inParams):
 
@@ -347,7 +369,9 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
         row_index = np.array(np.concatenate([[x for x in range(row)] for i in range(col)]), dtype=np.dtype('int64'))
 
         #Oneliner for writing out the file
-        fileout.write( np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('x','int64'),('y','int64'),(attributeName,theArray.dtype)]).ravel().tobytes() )
+        #Add this to make it a csv tofile(binaryFilePath), "," and modify the open statement to 'w'
+        np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('x','int64'),('y','int64'),(attributeName,theArray.dtype)]).ravel().tofile(binaryFilePath) 
+
     
     del column_index, row_index, theArray
 
@@ -362,8 +386,11 @@ def ParallelRasterization(coordinateData):
         print(e)
         print("Error")
     else:
+        arraydatatypes = []
         for datastore, offset, array, resultPath in arrayData:
-            print(datastore, offset, array.shape, resultPath)
+            print(datastore, offset, array.shape, resultPath, array.dtype)
+            arraydatatypes.append(array.dtype)
+        return arraydatatypes
             #binaryPartitionPath = "%s\%s\p_zones.scidb" % (binaryPath, datastore)
         #return arrayData
 

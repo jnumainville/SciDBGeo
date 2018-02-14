@@ -1,5 +1,12 @@
 #Python script
+def ReadReclassTxt(inShapefile):
+    """
 
+    """
+    reclassFile = '%s.txt' % (inShapefile.split('.')[0])
+    reclassText = open(reclassFile).read().replace('\n','')
+
+    return reclassText
 
 def CheckFiles(*argv):
     """
@@ -21,13 +28,10 @@ def argument_parser():
     parser.add_argument('-a', required=True, dest='array_name')
     parser.add_argument('-r', required=True, dest='raster')
     parser.add_argument('-s', required=True, dest='shapefile')
-    parser.add_argument('-p', required=True, help="This the path for the scidb_storage", dest='path')
+    parser.add_argument("-p", required=False, help="This the path for the scidb_storage",default='/home/scidb/scidb_data/0', dest='path')
+    parser.add_argument('-b', required=False, default=1, help="This is the array band for analysis", dest='band')    
+    parser.add_argument('-csv', required=False, dest='csv')
 
-    # parser.add_argument('-Tests', type=int, help="Number of tests you want to run", required=False, default=3, dest='Runs')
-    # parser.add_argument('-Mode', help="This allows you to choose the mode of analysis you want to conduct", type=int, default=1, required=True, dest='mode')
-    # parser.add_argument('-CSV', required=False, dest='CSV')
-    # parser.add_argument('-v', required=False, action="store_true", default=False, dest='verbose')
-    # parser.add_argument('-Host', required=False, help="SciDB host for connection", dest="host", default="http://localhost:8080")     
 
     # group = parser.add_mutually_exclusive_group()
     # group.add_argument("-v", "--verbose", action="store_true")
@@ -35,22 +39,30 @@ def argument_parser():
     return parser
 
 if __name__ == '__main__':
-    args = argument_parser().parse_args()
+    args = argument_parser().parse_args() 
     if CheckFiles(args.shapefile, args.raster):
         from scidb import iquery, statements
         sdb = iquery()
-        #My Object the creates array Metadata
+        
+        #My Object that creates array Metadata
         from SciDBParallel import ZonalStats, ArrayToBinary, ParallelRasterization, Rasterization, ParamSeperator
 
         raster = ZonalStats(args.raster, args.shapefile, args.array_name)
         raster.RasterMetadata(args.raster, args.shapefile, raster.SciDBInstances, args.path )
-        ParallelRasterization(raster.arrayMetaData)
+        datapackage = ParallelRasterization(raster.arrayMetaData)
         sdb_statements = statements(sdb)
-        theAttribute = 'id:%s' % (raster.rasterValueDataType)
+
+        theAttribute = 'id:%s' % (datapackage[0])
         sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
         #LoadOneDimensionalArray(self, sdb_instance, tempRastName, rasterAttributes, rasterType, binaryLoadPath)
-        sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, args.path)
-        raster.CreateMask('mask')
+        sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
+        numDimensions = raster.CreateMask(datapackage[0], 'mask')
+        raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
+
+        reclassText = ReadReclassTxt(args.shapefile)
+        raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, args.band)
+
+        OutputToArray(self, filePath, columnReader)
         # ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
     else:
         print(args.shapefile, args.raster)
