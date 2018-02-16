@@ -36,6 +36,7 @@ class iquery(object):
         
         #print(scidbArguments)
         p = self.subprocess.Popen(scidbArguments, shell=True)
+        p.wait()
         with open(thePath) as infile:
             data = csv.reader(infile)
             #min(value), max(value), avg(value), count(value)
@@ -63,15 +64,15 @@ class iquery(object):
 
         import os
         
-        if os.pathisdir( "/".join(theCSVPath.split("/")[:-1]) ):
+        #if os.pathisdir( "/".join(theCSVPath.split("/")[:-1]) ):
         
-            scidbArguments = """iquery -aq "%s" -o CSV -r %s;""" % (theQuery, theCSVPath)
-            #print(scidbArguments)
-            p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
-            p.wait()
+        scidbArguments = """iquery -aq "%s" -o csv+ -r %s;""" % (theQuery, theCSVPath)
+        #print(scidbArguments)
+        p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
+        p.wait()
 
-        else:
-            print("Bad CSV path: %s" % (theCSVPath))
+        # else:
+        #     print("Bad CSV path: %s" % (theCSVPath))
             
         #out, err = p.communicate()
         #print("OUT", out)

@@ -79,21 +79,40 @@ class ZonalStats(object):
 
         return bandArray
 
+    def NumpyToGDAL(self, arrayType):
+        """
+
+        """
+        gdalTypes= {
+        "uint8": 1,
+        "int8": 1,
+        "uint16": 2,
+        "int16": 3,
+        "uint32": 4,
+        "int32": 5,
+        "float32": 6,
+        "float64": 7,
+        "complex64": 10,
+        "complex128": 11,
+        }
+
+        return gdalTypes[arrayType]
+
     def WriteRaster(self, inArray, outPath, noDataValue=-999):
         """
 
         """
-        from osgeo import ogr, gdal
+        from osgeo import ogr, gdal, gdal_array
         driver = gdal.GetDriverByName('GTiff')
 
         height, width = inArray.shape
-
-        pixelType = gdal_array.NumericTypeCodeToGDALTypeCode(inArray.dtype)
+        #pixelType = self.NumpyToGDAL(inArray.dtype)
+        #pixelType = gdal_array.NumericTypeCodeToGDALTypeCode(inArray.dtype)
         #https://gist.github.com/CMCDragonkai/ac6289fa84bcc8888035744d7e00e2e6
         if driver:
-            geoTiff = driver.Create(outPath, width, height, 1, pixelType)
+            geoTiff = driver.Create(outPath, width, height, 1, 6)
             geoTiff.SetGeoTransform( (self.x, self.pixel_size, 0, self.y, 0, -self.pixel_size)  )
-            geoTiff.SetProjection(self.projection)
+            geoTiff.SetProjection(self.rasterProjection)
             band = geoTiff.GetRasterBand(1)
             band.SetNoDataValue(noDataValue)
 
@@ -106,9 +125,13 @@ class ZonalStats(object):
         """
 
         """
-        with open(filpath, 'w') as filein:
-            csv = filein.split('\n')
-            array = [row.split(',')[columnReader] for row in csv ]
+        with open(filePath, 'r') as filein:
+            csv = filein.read().split('\n')
+        
+        columns = self.lrY - self.tlY
+        width = self.lrX - self.tlX
+
+        array = self.np.array([row.split(',')[columnReader] for row in csv[:-1] ]).reshape((1960, width))
 
         return array
 
@@ -133,12 +156,13 @@ class ZonalStats(object):
         theLayer = vector_dataset.GetLayer()
         geomMin_X, geomMax_X, geomMin_Y, geomMax_Y = theLayer.GetExtent()
         
-        rasterWidth = int((geomMax_X - geomMin_X) / self.pixel_size)
+        self.width = int((geomMax_X - geomMin_X) / self.pixel_size)
         
         #TopLeft & lowerRight
         self.tlX, self.tlY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
         self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
         print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
+        print("Height %s - %s = %s" % (self.tlY-self.lrY, self.tlY, self.lrY))
         #print("Rows between %s" % (tlY-lrY))
         
         step = int(abs(self.tlY-self.lrY)/instances)
@@ -148,16 +172,16 @@ class ZonalStats(object):
             if i+step <= self.lrY:
                 print("top pixel: %s" % (i+c) )
                 topPixel = i+c
-                height = step
+                self.height = step
 
             else:
                 print("top pixel: %s" % (i+c) )
                 topPixel = i+c
-                height = abs(self.lrY-topPixel)
+                self.height = abs(self.lrY-topPixel)
             
             offset = abs(self.tlY - topPixel)
-            self.x,self.y = Pixel2world(rasterTransform, self.tlX, topPixel)
-            self.arrayMetaData.append((geomMin_X, self.y, height, rasterWidth, 
+            self.x,self.y = Pixel2world(rasterTransform, self.tlX, self.tlY)
+            self.arrayMetaData.append((geomMin_X, self.y, self.height, self.width, 
                 self.pixel_size, rasterTransform[5], self.rasterProjection, 
                 vectorPath, c, offset, dataStorePath))
 
@@ -285,7 +309,7 @@ class ZonalStats(object):
 
         return insertTime, queryTime
 
-    def JoinReclass(self, SciDBArray, tempRastName, tempArray,  minY, minX, maxY, maxX, thedimensions, reclassText, theband=0):
+    def JoinReclass(self, SciDBArray, tempRastName, tempArray,  minY, minX, maxY, maxX, thedimensions, reclassText, theband=0, outcsv=None):
         """
 
         """
@@ -294,11 +318,14 @@ class ZonalStats(object):
         dimName = thedimensions[0].split("=")[0]
         start = timeit.default_timer()
         if len(thedimensions) > 2:
-            sdbquery = "apply(join(between(slice(%s, %s, %s), %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), value, %s )" % (SciDBArray, dimName,theband, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
+            sdbquery = "apply(join(between(slice(%s, %s, %s), %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), newvalue, %s )" % (SciDBArray, dimName,theband, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
         else:
-            sdbquery = "apply(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), value, %s)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
+            sdbquery = "apply(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), newvalue, %s)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
         
-        self.sdb.query(sdbquery)
+        if outcsv: 
+            self.sdb.queryCSV(sdbquery, outcsv)
+        else:
+            self.sdb.query(sdbquery)
 
 def ParamSeperator(inParams):
 

@@ -31,6 +31,7 @@ def argument_parser():
     parser.add_argument("-p", required=False, help="This the path for the scidb_storage",default='/home/scidb/scidb_data/0', dest='path')
     parser.add_argument('-b', required=False, default=1, help="This is the array band for analysis", dest='band')    
     parser.add_argument('-csv', required=False, dest='csv')
+    parser.add_argument('-o', required=False, dest='outpath')
 
 
     # group = parser.add_mutually_exclusive_group()
@@ -49,6 +50,8 @@ if __name__ == '__main__':
 
         raster = ZonalStats(args.raster, args.shapefile, args.array_name)
         raster.RasterMetadata(args.raster, args.shapefile, raster.SciDBInstances, args.path )
+        a = raster.RasterizePolygon(args.raster, args.shapefile)
+        print(a.shape)
         datapackage = ParallelRasterization(raster.arrayMetaData)
         sdb_statements = statements(sdb)
 
@@ -57,12 +60,18 @@ if __name__ == '__main__':
         #LoadOneDimensionalArray(self, sdb_instance, tempRastName, rasterAttributes, rasterType, binaryLoadPath)
         sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
         numDimensions = raster.CreateMask(datapackage[0], 'mask')
-        raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
+        #raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
 
         reclassText = ReadReclassTxt(args.shapefile)
-        raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, args.band)
+        csvOut = '%s.csv' % (args.shapefile.split('.')[0])
+        tiffOut = '%s3.tiff' % (args.shapefile.split('.')[0])
+        
+        #csvOut, tiffOut)
 
-        OutputToArray(self, filePath, columnReader)
+        raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, args.band, csvOut)
+        
+        dataArray = raster.OutputToArray(csvOut, 3)
+        raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
         # ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
     else:
         print(args.shapefile, args.raster)
