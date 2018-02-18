@@ -49,15 +49,14 @@ if __name__ == '__main__':
         from SciDBParallel import ZonalStats, ArrayToBinary, ParallelRasterization, Rasterization, ParamSeperator
 
         raster = ZonalStats(args.raster, args.shapefile, args.array_name)
-        raster.RasterMetadata(args.raster, args.shapefile, raster.SciDBInstances, args.path )
+        raster.RasterMetadata(args.raster, args.shapefile, raster.SciDBInstances, args.path ) 
         a = raster.RasterizePolygon(args.raster, args.shapefile)
         print(a.shape)
         datapackage = ParallelRasterization(raster.arrayMetaData)
-        sdb_statements = statements(sdb)
+        sdb_statements = Statements(sdb)
 
         theAttribute = 'id:%s' % (datapackage[0])
         sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
-        #LoadOneDimensionalArray(self, sdb_instance, tempRastName, rasterAttributes, rasterType, binaryLoadPath)
         sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
         numDimensions = raster.CreateMask(datapackage[0], 'mask')
         #raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
@@ -65,8 +64,6 @@ if __name__ == '__main__':
         reclassText = ReadReclassTxt(args.shapefile)
         csvOut = '%s.csv' % (args.shapefile.split('.')[0])
         tiffOut = '%s3.tiff' % (args.shapefile.split('.')[0])
-        
-        #csvOut, tiffOut)
 
         raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, args.band, csvOut)
         

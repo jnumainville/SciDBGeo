@@ -1,5 +1,6 @@
 import timeit, itertools
 import multiprocessing as mp
+import csv
 
 class ZonalStats(object):
 
@@ -123,17 +124,23 @@ class ZonalStats(object):
 
     def OutputToArray(self, filePath, columnReader):
         """
-
+        The CSV array, must output the y and x coordinate values.
         """
+
         with open(filePath, 'r') as filein:
-            csv = filein.read().split('\n')
-        
-        columns = self.lrY - self.tlY
-        width = self.lrX - self.tlX
+            thedoc = csv.reader(filein)
+            dataset = np.array([line for line in thedoc])
 
-        array = self.np.array([row.split(',')[columnReader] for row in csv[:-1] ]).reshape((1960, width))
+        ycoordinates = dataset[:,0]
 
-        return array
+        unique_y, number_of_y = np.unique(ycoordinates, return_counts=True)
+        height = len(unique_y)
+        width = number_of_y[0]
+        valuearray = dataset[:,columnReader]
+
+        #array = self.np.array([row.split(',')[columnReader] for row in csv[:-1] ]).reshape((1960, width))
+
+        return valuearray.reshape( (height,width) )
 
 
     def RasterMetadata(self, inRasterPath, vectorPath, instances, dataStorePath):
@@ -162,7 +169,7 @@ class ZonalStats(object):
         self.tlX, self.tlY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
         self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
         print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
-        print("Height %s - %s = %s" % (self.tlY-self.lrY, self.tlY, self.lrY))
+        print("Height %s = %s = %s" % (self.tlY-self.lrY, self.tlY, self.lrY))
         #print("Rows between %s" % (tlY-lrY))
         
         step = int(abs(self.tlY-self.lrY)/instances)
@@ -404,6 +411,10 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
 
 
 def ParallelRasterization(coordinateData):
+    """
+
+    """
+
     pool = mp.Pool(len(coordinateData))
     try:
         arrayData = pool.imap(Rasterization, (c for c in coordinateData)  )
@@ -418,6 +429,5 @@ def ParallelRasterization(coordinateData):
             print(datastore, offset, array.shape, resultPath, array.dtype)
             arraydatatypes.append(array.dtype)
         return arraydatatypes
-            #binaryPartitionPath = "%s\%s\p_zones.scidb" % (binaryPath, datastore)
-        #return arrayData
+
 
