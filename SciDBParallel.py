@@ -177,13 +177,14 @@ class ZonalStats(object):
         self.arrayMetaData = []
         for c, i in enumerate(range(self.tlY,self.lrY,step)):
             if i+step <= self.lrY:
-                print("top pixel: %s" % (i+c) )
-                topPixel = i+c
+                topPixel = i
+                print("top pixel: %s" % (topPixel) )
+                
                 self.height = step
 
             else:
-                print("top pixel: %s" % (i+c) )
-                topPixel = i+c
+                topPixel = i
+                print("top pixel: %s" % (topPixel) )
                 self.height = abs(self.lrY-topPixel)
             
             offset = abs(self.tlY - topPixel)
@@ -416,6 +417,7 @@ def ParallelRasterization(coordinateData):
     """
 
     pool = mp.Pool(len(coordinateData))
+
     try:
         arrayData = pool.imap(Rasterization, (c for c in coordinateData)  )
         pool.close()
