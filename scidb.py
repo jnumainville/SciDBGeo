@@ -139,7 +139,7 @@ class iquery(object):
         
         return arrayNames
 
-class statements(object):
+class Statements(object):
 
     def __init__(self,sdb):
         """
@@ -152,7 +152,7 @@ class statements(object):
         """
         Create the loading array
         """
-                
+        print("Print here")
         if rasterArrayType <= 2:
             theQuery = "create array %s <y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
         elif rasterArrayType == 3:
@@ -172,7 +172,7 @@ class statements(object):
         """
         Function for loading GDAL data into a single dimension
         """
-        
+        print("Print here")
         if rasterType == 2:                
             items = [attribute.split(":")[1].strip() for attribute in rasterAttributes.split(",")  ]
             attributeValueTypes = ", ".join(items)
@@ -188,3 +188,30 @@ class statements(object):
             print("Error Loading DimensionalArray")
             print(query)
             return 0
+class DataTypes(object):
+
+    def __init__(self):
+
+        pass
+
+    def ExistingTypes(self):
+        scidbType = {
+        0: 'binary',
+        1: 'bool',
+        2: 'char',
+        3: 'datetime',
+        4: 'datetimetz',
+        5: 'double',
+        6: 'float',
+        7: 'indicator',
+        8: 'int16',
+        9: 'int32',
+        10: 'int64',
+        11: 'int8',
+        12: 'string',
+        3: 'uint16',
+        14: 'uint32',
+        15: 'uint64',
+        16: 'uint8',
+        17: 'void',
+        }

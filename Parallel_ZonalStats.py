@@ -42,7 +42,7 @@ def argument_parser():
 if __name__ == '__main__':
     args = argument_parser().parse_args() 
     if CheckFiles(args.shapefile, args.raster):
-        from scidb import iquery, statements
+        from scidb import iquery, Statements
         sdb = iquery()
         
         #My Object that creates array Metadata
@@ -55,20 +55,36 @@ if __name__ == '__main__':
         datapackage = ParallelRasterization(raster.arrayMetaData)
         sdb_statements = Statements(sdb)
 
-        theAttribute = 'id:%s' % (datapackage[0])
+        theAttribute = 'id:%s' % ('int32') #datapackage[0]
+        
         sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
         sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
-        numDimensions = raster.CreateMask(datapackage[0], 'mask')
+        #Load operator -1 in parallel
+        numDimensions = raster.CreateMask('int32', 'mask') #datapackage[0]
         #raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
 
         reclassText = ReadReclassTxt(args.shapefile)
         csvOut = '%s.csv' % (args.shapefile.split('.')[0])
-        tiffOut = '%s3.tiff' % (args.shapefile.split('.')[0])
+        tiffOut = '%s.tiff' % (args.shapefile.split('.')[0])
 
-        raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, args.band, csvOut)
-        
-        dataArray = raster.OutputToArray(csvOut, 3)
+        print("**************Reclassifiying raster*************")
+        raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, args.band, csvOut)        
+        dataArray = raster.OutputToArray(csvOut, 4)
         raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
+
+
+        """ iquery -aq "between(slice(population_stack, band, 1), 8551, 8935, 10515, 10572)" > /media/sf_scidb/population/census_tracts/popvalues.csv """
+        maskCsvOut = '%s_mask.csv' % (args.shapefile.split('.')[0])
+        maskTiffOut = '%s_mask.tiff' % (args.shapefile.split('.')[0])
+        print("**************outputing mask*************")
+        #maskQuery = "between(mask, 8551, 8935, 10515, 10572)"
+        #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
+        maskQuery = "scan(boundary)"
+        raster.sdb.queryCSV(maskQuery, maskCsvOut)
+        dataArray = raster.OutputToArray(maskCsvOut, 3)
+        raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
+     
+
         # ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
     else:
         print(args.shapefile, args.raster)

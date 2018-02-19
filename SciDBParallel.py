@@ -112,7 +112,7 @@ class ZonalStats(object):
         #https://gist.github.com/CMCDragonkai/ac6289fa84bcc8888035744d7e00e2e6
         if driver:
             geoTiff = driver.Create(outPath, width, height, 1, 6)
-            geoTiff.SetGeoTransform( (self.x, self.pixel_size, 0, self.y, 0, -self.pixel_size)  )
+            geoTiff.SetGeoTransform( (self.RasterX, self.pixel_size, 0, self.RasterY, 0, -self.pixel_size)  )
             geoTiff.SetProjection(self.rasterProjection)
             band = geoTiff.GetRasterBand(1)
             band.SetNoDataValue(noDataValue)
@@ -129,11 +129,14 @@ class ZonalStats(object):
 
         with open(filePath, 'r') as filein:
             thedoc = csv.reader(filein)
-            dataset = np.array([line for line in thedoc])
+            doclines = [line for line in thedoc]
+            dataset = self.np.array(doclines)
 
-        ycoordinates = dataset[:,0]
+        del doclines
 
-        unique_y, number_of_y = np.unique(ycoordinates, return_counts=True)
+        ycoordinates = dataset[:,1]
+
+        unique_y, number_of_y = self.np.unique(ycoordinates, return_counts=True)
         height = len(unique_y)
         width = number_of_y[0]
         valuearray = dataset[:,columnReader]
@@ -167,6 +170,7 @@ class ZonalStats(object):
         
         #TopLeft & lowerRight
         self.tlX, self.tlY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
+        self.RasterX, self.RasterY = Pixel2world(rasterTransform, self.tlX, self.tlY)
         self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
         print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
         print("Height %s = %s = %s" % (self.tlY-self.lrY, self.tlY, self.lrY))
@@ -178,8 +182,7 @@ class ZonalStats(object):
         for c, i in enumerate(range(self.tlY,self.lrY,step)):
             if i+step <= self.lrY:
                 topPixel = i
-                print("top pixel: %s" % (topPixel) )
-                
+                print("top pixel: %s" % (topPixel) )                
                 self.height = step
 
             else:
@@ -188,11 +191,10 @@ class ZonalStats(object):
                 self.height = abs(self.lrY-topPixel)
             
             offset = abs(self.tlY - topPixel)
-            self.x,self.y = Pixel2world(rasterTransform, self.tlX, self.tlY)
+            self.x, self.y = Pixel2world(rasterTransform, self.tlX, topPixel)
             self.arrayMetaData.append((geomMin_X, self.y, self.height, self.width, 
                 self.pixel_size, rasterTransform[5], self.rasterProjection, 
                 vectorPath, c, offset, dataStorePath))
-
 
 
     def SciDBZonalStats(self,rasterizedArray,  ):
@@ -330,7 +332,8 @@ class ZonalStats(object):
         else:
             sdbquery = "apply(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), newvalue, %s)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
         
-        if outcsv: 
+        if outcsv:
+            #print(sdbquery)
             self.sdb.queryCSV(sdbquery, outcsv)
         else:
             self.sdb.query(sdbquery)
@@ -359,17 +362,17 @@ def Rasterization(inParams):
     print("Rasterizing Vector in Parallel")
 
     x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(inParams)
-
+    print(offset, x, y)
     outTransform= [x, pixel_1, 0, y, 0, pixel_2 ]
     
     memDriver = gdal.GetDriverByName('MEM')
-    theRast = memDriver.Create('', width, height, 1, gdal.GDT_Int16)
+    theRast = memDriver.Create('', width, height, 1, gdal.GDT_Int32) #gdal.GDT_Int16
       
     theRast.SetProjection(projection)
     theRast.SetGeoTransform(outTransform)
     
     band = theRast.GetRasterBand(1)
-    band.SetNoDataValue(-99)
+    band.SetNoDataValue(-999)
     
     vector_dataset = ogr.Open(vectorPath)
     theLayer = vector_dataset.GetLayer()
