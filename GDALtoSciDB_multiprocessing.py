@@ -34,7 +34,7 @@ class RasterReader(object):
             else:
                 attString = ", ".join(attributes)
                 arrayType = 2
-            
+
         else:
             #Each pixel value will be a new band and we must loop.
             #Not checking for 2 attribute names that will crash
@@ -71,6 +71,8 @@ class RasterReader(object):
         elif raster.RasterCount == 1:
             rasterValueDataType = raster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)[0].dtype
             #rasterValueDataType= [rArray]
+
+        if rasterValueDataType == 'float32': rasterValueDataType = 'float'
         numbands = raster.RasterCount
         width = raster.RasterXSize 
         height  = raster.RasterYSize
@@ -119,6 +121,7 @@ class RasterReader(object):
         RasterReads = OrderedDict()
         rowMax = 0
         
+
         for y_version, yOffSet in enumerate(range(0, height, chunk)):
             #Adding +y_version will stagger the offset
             rowsRemaining = height - (y_version*chunk + y_version)
@@ -135,7 +138,7 @@ class RasterReader(object):
                 if columnsRemaining > chunk*tiles : columnsRemaining = chunk*tiles
 
                 #print(rowsRemaining, columnsRemaining, version_num, x_version,y_version,)
-                RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet+x_version), ("yOffSet",yOffSet+y_version), \
+                RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet), ("yOffSet",yOffSet), \
                     ("xWindow", columnsRemaining), ("yWindow", rowsRemaining), ("version", version_num), ("array_type", self.RasterArrayShape), \
                     ("attribute", attribute), ("scidbArray", theArray), ("y_version", y_version), ("chunk", chunk), ("bands", band) ])
 
@@ -159,7 +162,6 @@ def GlobalRasterLoading(sdb, theMetadata, theDict):
     This function is built in an effort to separate the redimensioning from the loading.
     I think redimensioning affects the performance of the load if they run concurrently
     """
-
 
     theData = theMetadata.RasterMetadata
     for theKey in theMetadata.RasterMetadata.keys():
@@ -203,13 +205,15 @@ def GDALReader(inParams):
     theSciDBLoadPath = inParams[4]
     bandIndex = inParams[5]
 
-    import scidb
-    sdb = scidb.iquery()
+    from scidb import iquery, Statements
+    sdb = iquery()
+    sdb_statements = Statements(sdb)
 
     tempArray = "temprast_%s" % (theMetadata['version'])
     rasterBinaryFilePath = "%s/%s.sdbbin" % (theSciDBOutPath, tempArray)
     rasterBinaryLoadPath = "%s/%s.sdbbin" % (theSciDBLoadPath, tempArray)
 
+    print("xoffset: %s, yOffSet: %s, xWindow: %s, yWindow: %s " % (theMetadata['xOffSet'], theMetadata['yOffSet'],theMetadata['xWindow'],theMetadata['yWindow']))
 
     raster = gdal.Open(theRasterPath, GA_ReadOnly)
     if bandIndex:
@@ -236,11 +240,11 @@ def GDALReader(inParams):
         
     os.chmod(rasterBinaryFilePath, 0o755)
     #Support multiple attributes or 2D and 3D arrays
-    CreateLoadArray(sdb, tempArray, theMetadata['attribute'], theMetadata['array_type'])
+    sdb_statements.CreateLoadArray(tempArray, theMetadata['attribute'], theMetadata['array_type'])
     start = timeit.default_timer()
+
         
-        
-    if LoadOneDimensionalArray(sdb, theInstance, tempArray, pseudoAttributes, theMetadata['array_type'], rasterBinaryLoadPath):
+    if sdb_statements.LoadOneDimensionalArray(theInstance, tempArray, pseudoAttributes, theMetadata['array_type'], rasterBinaryLoadPath):
         stop = timeit.default_timer()
         loadTime = stop-start
 
@@ -248,9 +252,10 @@ def GDALReader(inParams):
         if theMetadata['version'] == 0: print("Estimated time for loading in minutes %s: WriteTime: %s, LoadTime: %s" % ( dataLoadingTime, writeTime, loadTime))
 
         #Clean up
-        os.remove(rasterBinaryFilePath)
+        #os.remove(rasterBinaryFilePath)
         gc.collect()
-        
+        #sdb.query("remove(%s)" % (tempRastName))
+
         RedimensionAndInsertArray(sdb, tempArray, theMetadata['scidbArray'], theMetadata['array_type'], theMetadata['xOffSet'], theMetadata['yOffSet'])
         
         return (theMetadata['version'], writeTime, loadTime)
@@ -357,33 +362,33 @@ def CreateLoadArray(sdb, tempRastName, attribute_name, rasterArrayType):
         sdb.query(theQuery)
         #sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name,rasterValueDataType) )    
 
-def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterAttributes, rasterType, binaryLoadPath):
-    """
-    Function for loading GDAL data into a single dimension array
-    """
+# def LoadOneDimensionalArray(sdb, sdb_instance, tempRastName, rasterAttributes, rasterType, binaryLoadPath):
+#     """
+#     Function for loading GDAL data into a single dimension array
+#     """
     
-    if rasterType == 3:
-        #Raster has multiple attributes, with a z (band) dimension
-        attributeValueTypes = rasterAttributes.split(":")[1]
-        query = "load(%s, '%s' ,%s, '(int64, int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
+#     if rasterType == 3:
+#         #Raster has multiple attributes, with a z (band) dimension
+#         attributeValueTypes = rasterAttributes.split(":")[1]
+#         query = "load(%s, '%s' ,%s, '(int64, int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
 
-    elif rasterType == 2:
-        #Raster has multiple attributes, each attribute is separate
-        items = [attribute.split(":")[1].strip() for attribute in rasterAttributes.split(",")  ]
-        attributeValueTypes = ", ".join(items)
-        query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
-    else:
-        #Raster has one attribute two dimensions
-        attributeValueTypes = rasterAttributes.split(":")[1]
-        query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
+#     elif rasterType == 2:
+#         #Raster has multiple attributes, each attribute is separate
+#         items = [attribute.split(":")[1].strip() for attribute in rasterAttributes.split(",")  ]
+#         attributeValueTypes = ", ".join(items)
+#         query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
+#     else:
+#         #Raster has one attribute two dimensions
+#         attributeValueTypes = rasterAttributes.split(":")[1]
+#         query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
     
-    try:        
-        sdb.query(query)
-        return 1
-    except:
-        print("Error Loading DimensionalArray")
-        print(query)
-        return 0
+#     try:        
+#         sdb.query(query)
+#         return 1
+#     except:
+#         print("Error Loading DimensionalArray")
+#         print(query)
+#         return 0
 
 def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, RasterArrayShape, xOffSet, yOffSet):
     """
@@ -428,7 +433,7 @@ def MultiProcessLoading(Rasters, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     This function creates the pool based upon the number of SciDB instances and the generates the parameters for each Python instance
     """
     SciDBInstances = GetNumberofSciDBInstances()
-    pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)    #Multiprocessing module
+    pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)    
 
     aKey = list(Rasters.RasterMetadata.keys())[0]
     try:
@@ -436,7 +441,7 @@ def MultiProcessLoading(Rasters, rasterFilePath, SciDBOutPath, SciDBLoadPath):
             results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, 0)  ))
         else:
             for bandNum in range(1, Rasters.RasterMetadata[aKey]['iterate']+1):
-                #This works fine, check your EverNote notes for oddities.
+                #This works fine, check your EverNote notes for oddities. Loading Data into SciDB
                 results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath, SciDBOutPath, SciDBLoadPath, bandNum)  ))
     except:
         print(mp.get_logger())
@@ -459,7 +464,7 @@ def argument_parser():
     #parser.add_argument("-Host", required=True, help="SciDB host for connection", dest="host", default="localhost")
     #If host = NoSHIM, then use the cmd iquery   
     parser.add_argument("-r", required=True, help="Input file path for the raster", dest="rasterPath")    
-    parser.add_argument("-a", required=True, help="Name of the destination array", dest="rasterName")
+    parser.add_argument("-a", required=True, help="Name of the destination array", dest="arrayName")
     parser.add_argument("-n", required=True, nargs='*', help="Name of the attribute(s) for the destination array", dest="attributes", default="value")
     parser.add_argument("-t", required=False, type=int, help="Size in rows of the read window, default: 8", dest="tiles", default=8)
     parser.add_argument("-c", required=False, type=int, help="Chunk size for the destination array, default: 1,000", dest="chunk", default=1000)
@@ -476,7 +481,7 @@ if __name__ == '__main__':
     #Main running function
     args = argument_parser().parse_args()
     start = timeit.default_timer()
-    RasterInformation = RasterReader(args.rasterPath, args.rasterName, args.attributes, args.chunk, args.tiles)
+    RasterInformation = RasterReader(args.rasterPath, args.arrayName, args.attributes, args.chunk, args.tiles)
     ## Debugger to see the metadata for SciDB loading.
     #WriteFile("/home/04489/dhaynes/treecover_reads22.csv", RasterInformation.RasterMetadata)
     
