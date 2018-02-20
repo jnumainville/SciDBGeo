@@ -122,28 +122,28 @@ class ZonalStats(object):
 
         del geoTiff
 
-    def OutputToArray(self, filePath, columnReader):
-        """
-        The CSV array, must output the y and x coordinate values.
-        """
+    # def OutputToArray(self, filePath, columnReader, ycolumn=1):
+    #     """
+    #     The CSV array, must output the y and x coordinate values.
+    #     """
 
-        with open(filePath, 'r') as filein:
-            thedoc = csv.reader(filein)
-            doclines = [line for line in thedoc]
-            dataset = self.np.array(doclines)
+    #     with open(filePath, 'r') as filein:
+    #         thedoc = csv.reader(filein)
+    #         doclines = [line for line in thedoc]
+    #         dataset = self.np.array(doclines)
 
-        del doclines
+    #     del doclines
 
-        ycoordinates = dataset[:,1]
+    #     ycoordinates = dataset[:,1]
 
-        unique_y, number_of_y = self.np.unique(ycoordinates, return_counts=True)
-        height = len(unique_y)
-        width = number_of_y[0]
-        valuearray = dataset[:,columnReader]
+    #     unique_y, number_of_y = self.np.unique(ycoordinates, return_counts=True)
+    #     height = len(unique_y)
+    #     width = number_of_y[0]
+    #     valuearray = dataset[:,columnReader]
 
-        #array = self.np.array([row.split(',')[columnReader] for row in csv[:-1] ]).reshape((1960, width))
+    #     #array = self.np.array([row.split(',')[columnReader] for row in csv[:-1] ]).reshape((1960, width))
 
-        return valuearray.reshape( (height,width) )
+    #     return valuearray.reshape( (height,width) )
 
 
     def RasterMetadata(self, inRasterPath, vectorPath, instances, dataStorePath):
@@ -173,7 +173,7 @@ class ZonalStats(object):
         self.RasterX, self.RasterY = Pixel2world(rasterTransform, self.tlX, self.tlY)
         self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
         print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
-        print("Height %s = %s = %s" % (self.tlY-self.lrY, self.tlY, self.lrY))
+        print("Height %s = %s - %s" % (self.tlY-self.lrY, self.tlY, self.lrY))
         #print("Rows between %s" % (tlY-lrY))
         
         step = int(abs(self.tlY-self.lrY)/instances)
@@ -328,13 +328,13 @@ class ZonalStats(object):
         dimName = thedimensions[0].split("=")[0]
         start = timeit.default_timer()
         if len(thedimensions) > 2:
-            sdbquery = "apply(join(between(slice(%s, %s, %s), %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), newvalue, %s )" % (SciDBArray, dimName,theband, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
+            sdbquery = "apply(join(between(slice(%s, %s, %s), %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), newvalue, %s)" % (SciDBArray, dimName,theband, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
         else:
             sdbquery = "apply(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), newvalue, %s)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
         
         if outcsv:
             #print(sdbquery)
-            self.sdb.queryCSV(sdbquery, outcsv)
+            self.sdb.query("save(sort(%s,y,y,x,x),y,x),'%s', 0, 'csv') "  % (sdbquery[:-1], outcsv))
         else:
             self.sdb.query(sdbquery)
 

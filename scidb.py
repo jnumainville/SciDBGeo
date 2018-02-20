@@ -139,6 +139,56 @@ class iquery(object):
         
         return arrayNames
 
+    def OutputToArray(self, filePath, valueColumn, yColumn=1):
+        """
+        The CSV array, must output the y and x coordinate values.
+        """
+        import numpy as np
+
+        with open(filePath, 'r') as filein:
+            dataset = np.loadtxt(filein, delimiter=',', dtype=np.float)
+            # thedoc = self.csv.reader(filein)
+            # doclines = [line for line in thedoc]
+            # dataset = np.array(doclines)
+
+        # del doclines
+
+        ycoordinates = dataset[:,yColumn]
+
+        unique_y, number_of_y = np.unique(ycoordinates, return_counts=True)
+        height = len(unique_y)
+        width = number_of_y[0]
+        valuearray = dataset[:,valueColumn]
+
+        #array = self.np.array([row.split(',')[columnReader] for row in csv[:-1] ]).reshape((1960, width))
+
+        return valuearray.reshape( (height,width) )
+
+    def WriteRaster(self, inArray, inGeoTiff, outPath, noDataValue=-999):
+        """
+
+        """
+        from osgeo import ogr, gdal
+        driver = gdal.GetDriverByName('GTiff')
+
+        height, width = inArray.shape
+        #pixelType = self.NumpyToGDAL(inArray.dtype)
+        #pixelType = gdal_array.NumericTypeCodeToGDALTypeCode(inArray.dtype)
+        #https://gist.github.com/CMCDragonkai/ac6289fa84bcc8888035744d7e00e2e6
+        r = gdal.Open(inGeoTiff)
+
+        if driver:
+            geoTiff = driver.Create(outPath, width, height, 1, 6)
+            geoTiff.SetGeoTransform( r.GetGeoTransform() )
+            geoTiff.SetProjection( r.GetProjection() )
+            band = geoTiff.GetRasterBand(1)
+            band.SetNoDataValue(noDataValue)
+
+            band.WriteArray(inArray)
+            geoTiff.FlushCache()
+
+        del geoTiff
+
 class Statements(object):
 
     def __init__(self,sdb):
@@ -152,7 +202,7 @@ class Statements(object):
         """
         Create the loading array
         """
-        print("Print here")
+
         if rasterArrayType <= 2:
             theQuery = "create array %s <y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
         elif rasterArrayType == 3:
@@ -172,7 +222,7 @@ class Statements(object):
         """
         Function for loading GDAL data into a single dimension
         """
-        print("Print here")
+
         if rasterType == 2:                
             items = [attribute.split(":")[1].strip() for attribute in rasterAttributes.split(",")  ]
             attributeValueTypes = ", ".join(items)
@@ -188,6 +238,7 @@ class Statements(object):
             print("Error Loading DimensionalArray")
             print(query)
             return 0
+
 class DataTypes(object):
 
     def __init__(self):

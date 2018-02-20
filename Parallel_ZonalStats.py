@@ -28,7 +28,7 @@ def argument_parser():
     parser.add_argument('-a', required=True, dest='array_name')
     parser.add_argument('-r', required=True, dest='raster')
     parser.add_argument('-s', required=True, dest='shapefile')
-    parser.add_argument("-p", required=False, help="This the path for the scidb_storage",default='/home/scidb/scidb_data/0', dest='path')
+    parser.add_argument('-p', required=False, help="This the path for the scidb_storage",default='/home/scidb/scidb_data/0', dest='path')
     parser.add_argument('-b', required=False, default=1, help="This is the array band for analysis", dest='band')    
     parser.add_argument('-csv', required=False, dest='csv')
     parser.add_argument('-o', required=False, dest='outpath')
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
         print("**************Reclassifiying raster*************")
         raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, args.band, csvOut)        
-        dataArray = raster.OutputToArray(csvOut, 4)
+        dataArray = sdb.OutputToArray(csvOut, valueColumn=2, yColumn= 3)
         raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
 
 
@@ -81,8 +81,17 @@ if __name__ == '__main__':
         #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
         maskQuery = "scan(boundary)"
         raster.sdb.queryCSV(maskQuery, maskCsvOut)
-        dataArray = raster.OutputToArray(maskCsvOut, 3)
+        dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
         raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
+
+        dataCsvOut = '%s_data.csv' % (args.shapefile.split('.')[0])
+        dataTiffOut = '%s_data.tiff' % (args.shapefile.split('.')[0])
+        print("**************outputing data*************")
+        
+        Output2D_Image = "save(sort(apply(between(%s, 8551, 8935, 10515, 10572), y, y, x, x), y, x) ,'%s', 0, 'csv');" % (raster.SciDBArrayName, dataCsvOut)
+        raster.sdb.query(Output2D_Image)
+        dataArray = sdb.OutputToArray(dataCsvOut, valueColumn=0, yColumn=1)
+        raster.WriteRaster(dataArray, dataTiffOut, noDataValue=-999)
      
 
         # ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
