@@ -173,28 +173,35 @@ class ZonalStats(object):
         self.RasterX, self.RasterY = Pixel2world(rasterTransform, self.tlX, self.tlY)
         self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
         print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
-        print("Height %s = %s - %s" % (self.tlY-self.lrY, self.tlY, self.lrY))
+        print("Height %s = %s - %s" % (self.lrY-self.tlY, self.lrY, self.tlY))
         #print("Rows between %s" % (tlY-lrY))
         
         step = int(abs(self.tlY-self.lrY)/instances)
         
         self.arrayMetaData = []
-        for c, i in enumerate(range(self.tlY,self.lrY,step)):
-            if i+step <= self.lrY:
-                topPixel = i
+
+        top = self.tlY
+        for i in range(instances):
+            if top+step <= self.lrY and i < 3:
+                topPixel = top
                 print("top pixel: %s" % (topPixel) )                
                 self.height = step
-
+            elif top+step <= self.lrY and i == 3:
+                topPixel = top
+                print("long read, top pixel: %s" % (topPixel) )                
+                self.height = self.lrY - topPixel
             else:
                 topPixel = i
-                print("top pixel: %s" % (topPixel) )
+                print("short read, top pixel: %s" % (topPixel) )
                 self.height = abs(self.lrY-topPixel)
+
+            top += step
             
             offset = abs(self.tlY - topPixel)
             self.x, self.y = Pixel2world(rasterTransform, self.tlX, topPixel)
             self.arrayMetaData.append((geomMin_X, self.y, self.height, self.width, 
                 self.pixel_size, rasterTransform[5], self.rasterProjection, 
-                vectorPath, c, offset, dataStorePath))
+                vectorPath, i, offset, dataStorePath))
 
 
     def SciDBZonalStats(self,rasterizedArray,  ):
