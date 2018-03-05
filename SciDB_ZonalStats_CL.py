@@ -28,7 +28,7 @@ def world2Pixel(geoMatrix, x, y):
     pixel = int((x - ulX) / xDist)
     line = int((ulY - y) / xDist)
     
-    return (pixel, line)
+    return (abs(pixel), abs(line))
     
 
 def RasterizePolygon(inRasterPath, outRasterPath, vectorPath):
@@ -128,7 +128,7 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     queryTime = stop-start
-    sdb.queryResults(sdbquery, r"/home/04489/dhaynes/%s_states2.csv" % (SciDBArray) )
+    #sdb.queryResults(sdbquery, r"/home/04489/dhaynes/%s_states2.csv" % (SciDBArray) )
     if verbose: print(sdbquery, queryTime)
     sdb.query("remove(%s)" % tempArray)
     sdb.query("remove(%s)" % tempRastName)

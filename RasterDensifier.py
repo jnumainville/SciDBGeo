@@ -54,7 +54,7 @@ def main(inRasterFilePath, densifier, iterator, outRasterFilePath ):
     
     #Create new raster file
     tiffDriver = gdal.GetDriverByName('GTiff')
-    theRast = tiffDriver.Create(outRasterFilePath, numCols*densifier , numRows*densifier, 1, rasterType,) # options = [ 'COMPRESS=DEFLATE' ]
+    theRast = tiffDriver.Create(outRasterFilePath, numCols*densifier , numRows*densifier, 1, rasterType, options = [ 'COMPRESS=DEFLATE' ])
     if theRast:
         theRast.SetProjection(rasterProjection)
         theRast.SetGeoTransform(alteredTransform)

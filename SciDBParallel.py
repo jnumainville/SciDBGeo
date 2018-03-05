@@ -167,6 +167,7 @@ class ZonalStats(object):
         geomMin_X, geomMax_X, geomMin_Y, geomMax_Y = theLayer.GetExtent()
         
         self.width = int((geomMax_X - geomMin_X) / self.pixel_size)
+        print(self.width)
         
         #TopLeft & lowerRight
         self.tlX, self.tlY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
@@ -177,16 +178,16 @@ class ZonalStats(object):
         #print("Rows between %s" % (tlY-lrY))
         
         step = int(abs(self.tlY-self.lrY)/instances)
-        
+        print("Each partition will have approximately %s lines" % (step))
         self.arrayMetaData = []
 
         top = self.tlY
         for i in range(instances):
-            if top+step <= self.lrY and i < 3:
+            if top+step <= self.lrY and i < instances-1:
                 topPixel = top
                 print("top pixel: %s" % (topPixel) )                
                 self.height = step
-            elif top+step <= self.lrY and i == 3:
+            elif top+step <= self.lrY and i == instances-1:
                 topPixel = top
                 print("long read, top pixel: %s" % (topPixel) )                
                 self.height = self.lrY - topPixel

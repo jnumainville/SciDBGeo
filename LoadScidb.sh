@@ -1,11 +1,10 @@
 #!/bin/bash
 #Script for batch loading data into SciDB
 
-while getopts a:r:i: option
+while getopts a:r: option
 do
     case "${option}"
     in
-    i) instances=${OPTARG};;
     r) raster=${OPTARG};;
     a) array=${OPTARG};;
     esac
@@ -14,11 +13,13 @@ done
 
 
       
-#python3 GDALtoSciDB_multiprocessing.py -Instances 10 11 12 13 14 15 16 17 -Host http://iuwrang-xfer2.uits.indiana.edu:8080 -RasterPath /home/04489/dhaynes/ESACCI_300m_2010.tif -ScidbArray meris_2000 -Tiles 4 -Chunk 2000 -AttributeNames value -TempOut /mnt -SciDBLoadPath /data/04489/dhaynes
-#
-for chunk in 500 1000 1500 2000 2500 3000 3500 4000; do
-    args=("-Instances ${instances}" "-SciDBLoadPath /data/04489/dhaynes" "-TempOut /mnt" "-AttributeNames value" "-Tiles ${chunk}" "-RasterPath ${raster}" "-ScidbArray ${array}_${chunk}" "-Host http://localhost:8080")
+#python3 GDALtoSciDB_multiprocessing.py -Host NoSHIM -RasterPath ../ESACCI_300m_2010.tif -SciDBArray meris_1000 -AttributeNames value -Tiles 8 -Chunk 1000 -TempOut /mnt -SciDBLoadPath /data/04489/dhaynes
+
+for i in 500,4000 1000,3500 1500,3000 2000,25000 2500,2000 3000,15000 3500,1000 4000,500; do
+    IFS="," read chunk tiles <<< "${i}"
+    #echo "${chunk}" and "${tiles}"
+    args=("-SciDBLoadPath /data/04489/dhaynes" "-TempOut /mnt" "-AttributeNames value" "-Tiles ${tiles}" "-Chunk ${chunk}" "-RasterPath ${raster}" "-SciDBArray ${array}_${chunk}" "-Host NoSHIM")
     #LoadArray="python3 GDALtoSciDB_multiprocessing.py 
     python3 GDALtoSciDB_multiprocessing.py ${args[@]}
-    #echo ${args[@]}
+    echo ${args[@]}
 done
