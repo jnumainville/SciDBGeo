@@ -12,10 +12,10 @@ def datasetsprep():
     """
     
 
-    chunk_sizes = [500, 1000] #, 1500, 2000, 2500, 3000, 3500, 4000]
-    array_names = ["glc2000_clipped"] #,"meris_2010_clipped", "nlcd_2006_clipped"]
-    raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif"] #,"/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006_clipped.tif"]
-    shapefiles = ["/home/04489/dhaynes/shapefiles/states.shp"]#,"/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp","/home/04489/dhaynes/shapefiles/tracts.shp"]
+    chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+    array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
+    raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006_clipped.tif"]
+    shapefiles = ["/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp","/home/04489/dhaynes/shapefiles/tracts.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
     rasterPaths =  [ raster_path for raster_path in raster_paths for chunk in chunk_sizes ]
