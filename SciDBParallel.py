@@ -161,19 +161,19 @@ class ZonalStats(object):
         rasterTransform = inRaster.GetGeoTransform()
         self.rasterProjection = inRaster.GetProjection()
         self.pixel_size = rasterTransform[1]
-        print(rasterTransform)
+        # print(rasterTransform)
         vector_dataset = ogr.Open(vectorPath)
         theLayer = vector_dataset.GetLayer()
         geomMin_X, geomMax_X, geomMin_Y, geomMax_Y = theLayer.GetExtent()
         
         self.width = int((geomMax_X - geomMin_X) / self.pixel_size)
-        print(self.width)
+        # print(self.width)
         
         #TopLeft & lowerRight
         self.tlX, self.tlY = world2Pixel(rasterTransform, geomMin_X, geomMax_Y)
         self.RasterX, self.RasterY = Pixel2world(rasterTransform, self.tlX, self.tlY)
         self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
-        print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
+        # print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
         print("Height %s = %s - %s" % (self.lrY-self.tlY, self.lrY, self.tlY))
         #print("Rows between %s" % (tlY-lrY))
         
@@ -185,15 +185,15 @@ class ZonalStats(object):
         for i in range(instances):
             if top+step <= self.lrY and i < instances-1:
                 topPixel = top
-                print("top pixel: %s" % (topPixel) )                
+                # print("top pixel: %s" % (topPixel) )                
                 self.height = step
             elif top+step <= self.lrY and i == instances-1:
                 topPixel = top
-                print("long read, top pixel: %s" % (topPixel) )                
+                # print("long read, top pixel: %s" % (topPixel) )                
                 self.height = self.lrY - topPixel
             else:
                 topPixel = i
-                print("short read, top pixel: %s" % (topPixel) )
+                # print("short read, top pixel: %s" % (topPixel) )
                 self.height = abs(self.lrY-topPixel)
 
             top += step
@@ -205,16 +205,18 @@ class ZonalStats(object):
                 vectorPath, i, offset, dataStorePath))
 
 
-    def SciDBZonalStats(self,rasterizedArray,  ):
-        #This is the full parallel mode
-        print("Parallel Version of Zonal Stats")
+    def SciDBZonalStats(self,rasterizedArray):
+        """
+        This is the full parallel mode of zonal statistics
+        """
+        # print("Parallel Version of Zonal Stats")
         
 
-        print("Partitioning Array")
+        # print("Partitioning Array")
         start = timeit.default_timer()
         chunkedArrays = self.np.array_split(rasterizedArray, 2, axis=0)
         stop = timeit.default_timer()
-        print("Took: %s" % (stop-start))
+        # print("Took: %s" % (stop-start))
 
         #This is super ugly, but I can't think of the one liner!
         allColumns = [c.shape[0] for c in chunkedArrays]
@@ -306,7 +308,7 @@ class ZonalStats(object):
     def GlobalJoin_SummaryStats(self, SciDBArray, tempRastName, tempArray, minY, minX, maxY, maxX, thedimensions, theband=0, csvPath=None):
         """
         This is the SciDB Global Join
-        Goins the array and conducts the grouped_aggregate
+        Joins the array and conducts the grouped_aggregate
         """
         insertTime = self.InsertRedimension(tempRastName, tempArray, minY, minX)
 
@@ -367,10 +369,10 @@ def Rasterization(inParams):
     Function for rasterizing in parallel
     """
     from osgeo import ogr, gdal
-    print("Rasterizing Vector in Parallel")
+    # print("Rasterizing Vector in Parallel")
 
     x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(inParams)
-    print(offset, x, y)
+    # print(offset, x, y)
     outTransform= [x, pixel_1, 0, y, 0, pixel_2 ]
     
     memDriver = gdal.GetDriverByName('MEM')
@@ -404,7 +406,7 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
     output: Numpy 2D array in binary format
     """
     import numpy as np
-    print("Writing out file: %s" % (binaryFilePath))
+    # print("Writing out file: %s" % (binaryFilePath))
     col, row = theArray.shape
     with open(binaryFilePath, 'wb') as fileout:
         #Oneliner that creates the column index. Pull out [y for y in range(col)] to see how it works
@@ -439,7 +441,7 @@ def ParallelRasterization(coordinateData):
     else:
         arraydatatypes = []
         for datastore, offset, array, resultPath in arrayData:
-            print(datastore, offset, array.shape, resultPath, array.dtype)
+            # print(datastore, offset, array.shape, resultPath, array.dtype)
             arraydatatypes.append(array.dtype)
         return arraydatatypes
 
