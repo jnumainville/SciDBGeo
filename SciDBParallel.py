@@ -399,6 +399,8 @@ def Rasterization(inParams):
     c, r = bandArray.shape
     if c*r > 50000000:
         print("Number of pixels: %s" % (c*r))
+        from GDALtoSciDB_multiprocessing import RasterReader
+        RasterReader('','mask', 'id', 1000, 8)
         with open(binaryPartitionPath, 'wb') as fileout:
             for partitionBandArray in np.array_split(bandArray, 10, axis=0):
                 ArrayToBinary(partitionBandArray, binaryPartitionPath, 'mask', offset)
@@ -438,7 +440,15 @@ def ParallelRasterization(coordinateData):
     """
 
     """
+    rasterTotalPixels = 0
+    for c in coordinateData:
+        x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(c) 
+        totalPixels = height*width
+        rasterTotalPixels += totalPixels
 
+    print(rasterTotalPixels)
+
+       
     pool = mp.Pool(len(coordinateData))
 
     try:
