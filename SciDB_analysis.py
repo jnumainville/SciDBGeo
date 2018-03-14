@@ -12,9 +12,9 @@ def datasetsprep():
     """
     
 
-    chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
-    array_names = ["glc2000_clipped","meris2015_clipped"]# "nlcd_2006_clipped"]
-    raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif"] #, "/home/04489/dhaynes/nlcd_2006.tif"]
+    chunk_sizes = [500]#, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+    array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
+    raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006.tif"]
     shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
@@ -44,9 +44,9 @@ def WriteFile(filePath, theDictionary):
 if __name__ == '__main__':
 
     sdb = iquery()
-    runs = [1,2,3]
+    runs = [1]#,2,3]
     analytic = 0
-    filePath = '/mnt/zonal_stats_3_5_2018_12_instances.csv'
+    filePath = '' #mnt/zonal_stats_3_9_2018_4_executors.csv'
     timings = OrderedDict()
     rasterStatsCSV = ''
 

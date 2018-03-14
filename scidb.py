@@ -211,12 +211,11 @@ class Statements(object):
         try:
             #print(theQuery)
             self.sdb.query(theQuery)
-            self.sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name, rasterValueDataType) )
         except:
             #Silently deleting temp arrays
             self.sdb.query("remove(%s)" % (tempRastName))
             self.sdb.query(theQuery)
-            #sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name,rasterValueDataType) )    
+                
 
     def LoadOneDimensionalArray(self, sdb_instance, tempRastName, rasterAttributes, rasterType, binaryLoadPath):
         """

@@ -369,6 +369,7 @@ def Rasterization(inParams):
     Function for rasterizing in parallel
     """
     from osgeo import ogr, gdal
+    import numpy as np
     # print("Rasterizing Vector in Parallel")
 
     x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(inParams)
@@ -394,7 +395,16 @@ def Rasterization(inParams):
     del theRast
 
     binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
-    ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)    
+    #ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)    
+    c, r = bandArray.shape
+    if c*r > 50000000:
+        print("Number of pixels: %s" % (c*r))
+        with open(binaryPartitionPath, 'wb') as fileout:
+            for partitionBandArray in np.array_split(bandArray, 10, axis=0):
+                ArrayToBinary(partitionBandArray, binaryPartitionPath, 'mask', offset)
+                yOffSet += partitionBandArray.shape[0] + offset
+    else:
+        ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)  
     
     return counter, offset, bandArray, binaryPartitionPath
 
