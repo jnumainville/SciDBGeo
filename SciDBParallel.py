@@ -1,6 +1,128 @@
 import timeit, itertools
 import multiprocessing as mp
+import numpy as np
 import csv
+
+class RasterReader(object):
+
+    def __init__(self, RasterPath, scidbArray, attribute, chunksize, tiles, yOffSet):
+        """
+        Initialize the class RasterReader
+        """
+        
+        self.width, self.height, self.datatype, self.numbands = self.GetRasterDimensions(RasterPath)
+        self.AttributeNames = attribute
+        self.AttributeString, self.RasterArrayShape = self.RasterShapeLogic(attribute)
+        self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, self.AttributeString, self.numbands )
+        
+    def RasterShapeLogic(self, attributeNames):
+        """
+        This function will provide the logic for determining the shape of the raster
+        """
+        if len(attributeNames) >= 1 and self.numbands > 1:
+            #Each pixel value will be a new attribute
+            attributes = ["%s:%s" % (i, self.datatype) for i in attributeNames ]
+            if len(attributeNames) == 1:
+                attString = " ".join(attributes)
+                arrayType = 3
+    
+            else:
+                attString = ", ".join(attributes)
+                arrayType = 2
+        else:
+            #Each pixel value will be a new band and we must loop.
+            #Not checking for 2 attribute names that will crash
+            attString = "%s:%s" % (attributeNames[0], self.datatype)
+            arrayType = 1
+            
+        return (attString, arrayType)
+            
+            
+    def GetMetadata(self, scidbInstances, rasterFilePath, outPath, loadPath,  band):
+        """
+        Generator for the class
+        Input: 
+        scidbInstance = SciDB Instance IDs
+        rasterFilePath = Absolute Path to the GeoTiff
+        """
+        
+        for key, process, filepath, outDirectory, loadDirectory, band in zip(self.RasterMetadata.keys(), itertools.cycle(scidbInstances), itertools.repeat(rasterFilePath), itertools.repeat(outPath), itertools.repeat(loadPath), itertools.repeat(band)):
+            yield self.RasterMetadata[key], process, filepath, outDirectory, loadDirectory,  band
+            
+    def GetRasterDimensions(self, thePath):
+        """
+        Function gets the dimensions of the raster file 
+        """
+        if type(thePath) == string:
+            raster = gdal.Open(thePath, GA_ReadOnly)
+    
+            if raster.RasterCount > 1:
+                rArray = raster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)
+                #print(rArray)
+                rasterValueDataType = rArray[0][0].dtype
+                #print("RasterValue Type", rasterValueDataType)
+
+            elif raster.RasterCount == 1:
+                rasterValueDataType = raster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)[0].dtype
+                #rasterValueDataType= [rArray]
+
+            if rasterValueDataType == 'float32': rasterValueDataType = 'float'
+            numbands = raster.RasterCount
+            width = raster.RasterXSize 
+            height  = raster.RasterYSize
+            print(rasterValueDataType)
+            
+            del raster
+        
+        elif type(thePath).__module__ == 'numpy':
+            rasterValueDataType = thePath.dtype
+            height, width = thePaths.shape
+            numbands = 1
+
+        return (width, height, rasterValueDataType, numbands)
+    
+
+    def CreateArrayMetadata(self, theArray, widthMax, heightMax, widthMin=0, heightMin=0, chunk=1000, tiles=1, attribute='value', band=1):
+        """
+        This function gathers all the metadata necessary
+        The loops are 
+        """
+        
+        RasterReads = OrderedDict()
+        rowMax = 0
+        
+        for y_version, yOffSet in enumerate(range(heightMin, heightMax, chunk)):
+            #Adding +y_version will stagger the offset
+            rowsRemaining = heightMax - (y_version*chunk + y_version)
+
+            #If this is not a short read, then read the correct size.
+            if rowsRemaining > chunk: rowsRemaining = chunk
+            
+            for x_version, xOffSet in enumerate(range(widthMin, widthMax, chunk*tiles)):
+                version_num = rowMax+x_version
+                #Adding +x_version will stagger the offset
+                columnsRemaining = widthMax - (x_version*chunk*tiles + x_version)
+                
+                #If this is not a short read, then read the correct size.
+                if columnsRemaining > chunk*tiles : columnsRemaining = chunk*tiles
+
+                #print(rowsRemaining, columnsRemaining, version_num, x_version,y_version,)
+                RasterReads[str(version_num)] = OrderedDict([ ("xOffSet",xOffSet), ("yOffSet",yOffSet), \
+                    ("xWindow", columnsRemaining), ("yWindow", rowsRemaining), ("version", version_num), ("array_type", self.RasterArrayShape), \
+                    ("attribute", attribute), ("scidbArray", theArray), ("y_version", y_version), ("chunk", chunk), ("bands", band) ])
+
+            
+            rowMax += math.ceil(vwidthMax/(chunk*tiles))
+
+        for r in RasterReads.keys():
+            RasterReads[r]["loops"] = len(RasterReads)
+            
+            if len(RasterReads[r]["attribute"].split(" ")) < RasterReads[r]["bands"]:
+                RasterReads[r]["iterate"] = RasterReads[r]["bands"]
+            else:
+                RasterReads[r]["iterate"] = 0
+            
+        return RasterReads
 
 class ZonalStats(object):
 
@@ -10,9 +132,6 @@ class ZonalStats(object):
         
         self.sdb = scidb.iquery()
         self.__SciDBInstances()
-        
-        #self.pool = mp.Pool(2) #self.SciDBInstances)
-        self.np = np
 
         self.vectorPath = boundaryPath
         self.geoTiffPath = rasterPath
@@ -99,6 +218,28 @@ class ZonalStats(object):
 
         return gdalTypes[arrayType]
 
+    def SciDBDataTypes(self):
+        """
+        List of all SciDB Data Types
+        """
+        SciDBTypes ={
+        "bool" :"",
+        "char": "",
+        "datetime" :"",
+        "double" : "float64",
+        "float" : "float32",
+        "int8" : "int8",
+        "int16": "int16",
+        "int32": "int32",
+        "int64": "int64",
+        "string": "",
+        "uint8": "uint8",
+        "uint16": "uint16",
+        "uint32": "uint32",
+        "uint64": ""
+        }
+
+
     def WriteRaster(self, inArray, outPath, noDataValue=-999):
         """
 
@@ -116,35 +257,11 @@ class ZonalStats(object):
             geoTiff.SetProjection(self.rasterProjection)
             band = geoTiff.GetRasterBand(1)
             band.SetNoDataValue(noDataValue)
-
+            #Writing Array
             band.WriteArray(inArray)
             geoTiff.FlushCache()
 
         del geoTiff
-
-    # def OutputToArray(self, filePath, columnReader, ycolumn=1):
-    #     """
-    #     The CSV array, must output the y and x coordinate values.
-    #     """
-
-    #     with open(filePath, 'r') as filein:
-    #         thedoc = csv.reader(filein)
-    #         doclines = [line for line in thedoc]
-    #         dataset = self.np.array(doclines)
-
-    #     del doclines
-
-    #     ycoordinates = dataset[:,1]
-
-    #     unique_y, number_of_y = self.np.unique(ycoordinates, return_counts=True)
-    #     height = len(unique_y)
-    #     width = number_of_y[0]
-    #     valuearray = dataset[:,columnReader]
-
-    #     #array = self.np.array([row.split(',')[columnReader] for row in csv[:-1] ]).reshape((1960, width))
-
-    #     return valuearray.reshape( (height,width) )
-
 
     def RasterMetadata(self, inRasterPath, vectorPath, instances, dataStorePath):
         """
@@ -175,6 +292,9 @@ class ZonalStats(object):
         self.lrX, self.lrY = world2Pixel(rasterTransform, geomMax_X, geomMin_Y)
         # print(self.tlY, self.lrY, geomMin_Y, geomMax_Y)
         print("Height %s = %s - %s" % (self.lrY-self.tlY, self.lrY, self.tlY))
+        self.VectorHeight = abs(self.lrY-self.tlY)
+        self.VectorWidth = abs(self.width)
+
         #print("Rows between %s" % (tlY-lrY))
         
         step = int(abs(self.tlY-self.lrY)/instances)
@@ -214,7 +334,7 @@ class ZonalStats(object):
 
         # print("Partitioning Array")
         start = timeit.default_timer()
-        chunkedArrays = self.np.array_split(rasterizedArray, 2, axis=0)
+        chunkedArrays = np.array_split(rasterizedArray, 2, axis=0)
         stop = timeit.default_timer()
         # print("Took: %s" % (stop-start))
 
@@ -397,14 +517,19 @@ def Rasterization(inParams):
     binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
     #ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)    
     c, r = bandArray.shape
+
     if c*r > 50000000:
+        from SciDBParallel import ZonalStats import RasterReader
+        bigRaster = RasterReader(bandArray, 'mask', 'id', chunksize, tiles, yOffSet):
         print("Number of pixels: %s" % (c*r))
-        from GDALtoSciDB_multiprocessing import RasterReader
-        RasterReader('','mask', 'id', 1000, 8)
-        with open(binaryPartitionPath, 'wb') as fileout:
-            for partitionBandArray in np.array_split(bandArray, 10, axis=0):
-                ArrayToBinary(partitionBandArray, binaryPartitionPath, 'mask', offset)
-                yOffSet += partitionBandArray.shape[0] + offset
+
+        for x in bigRaster.RasterReadingData:
+            print(x)
+            quit()
+        # with open(binaryPartitionPath, 'wb') as fileout:
+        #     for partitionBandArray in np.array_split(bandArray, 10, axis=0):
+        #         ArrayToBinary(partitionBandArray, binaryPartitionPath, 'mask', offset)
+        #         yOffSet += partitionBandArray.shape[0] + offset
     else:
         ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)  
     
@@ -435,20 +560,37 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
     
     del column_index, row_index, theArray
 
+def RasterizationDecider(theRasterizationMetaData):
+    """
+    This function will determine if the rasterization can use the parallel load or another strategy
+    """
+    rasterTotalPixels = 0
+    maxRasterizationPixels = []
+    for c in theRasterizationMetaData:
+        x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(c)
+        totalPixels = height*width
+        rasterTotalPixels += totalPixels
+        maxRasterizationPixels.append(totalPixels)
+
+    largestRasterization = max(maxRasterizationPixels)
+
+    if largestRasterization > 50000000:
+        pass
+        #Create mask array
+        numDimensions = raster.CreateMask('int32', 'mask') #This is hardcoded for int32
+    else:
+        return 1
+
+
 
 def ParallelRasterization(coordinateData):
     """
 
     """
-    rasterTotalPixels = 0
-    for c in coordinateData:
-        x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(c) 
-        totalPixels = height*width
-        rasterTotalPixels += totalPixels
 
-    print(rasterTotalPixels)
-
-       
+    RasterizationDecider(coordinateData)
+  
+    #if decision == 1:
     pool = mp.Pool(len(coordinateData))
 
     try:
