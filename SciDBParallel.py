@@ -677,13 +677,13 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
 
     """
 
-    bigRaster = BigRasterizationDecider(coordinateData, theRasterClass)
+    bigRaster = RasterizationDecider(coordinateData, theRasterClass)
   
 
     pool = mp.Pool(len(coordinateData))
 
     try:
-        arrayData = pool.imap(Rasterization, (c for c in coordinateData)  )
+        arrayData = pool.imap(BigRasterization, (c for c in coordinateData)  )
         pool.close()
         pool.join()
     except Exception as e:
