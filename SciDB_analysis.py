@@ -1,5 +1,5 @@
 from scidb import iquery, Statements
-from SciDBParallel import ZonalStats, ArrayToBinary, ParallelRasterization, Rasterization, ParamSeperator
+from SciDBParallel import *
 import os, timeit, csv
 from collections import OrderedDict
 
