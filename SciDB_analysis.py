@@ -70,10 +70,11 @@ if __name__ == '__main__':
                 theAttribute = 'id:%s' % (datapackage[0]) #
                 sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
                 sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
-                #Load operator -1 in parallel
+                #SciDB Load operator -1 loads in parallel
                 numDimensions = raster.CreateMask(datapackage[0], 'mask')
+                redimension_time = raster.InsertRedimension( 'boundary', 'mask', raster.tlY, raster.tlX )
 
-            redimension_time, summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, rasterStatsCSV)
+            summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, rasterStatsCSV)
             stopSummaryStats = timeit.default_timer()            
 
             analytic += 1
