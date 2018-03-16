@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
             timings[analytic] = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("SciDB_Executors", raster.SciDBInstances), ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]), ("full_time", stopSummaryStats-start), ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep) ])
             sdb.query("remove(mask)")
-            sdb.query("remove(boundary)")
+            if not bigRaster: sdb.query("remove(boundary)")
             del raster
 
     if filePath: WriteFile(filePath, timings)
