@@ -430,7 +430,7 @@ class ZonalStats(object):
         This is the SciDB Global Join
         Joins the array and conducts the grouped_aggregate
         """
-        insertTime = self.InsertRedimension(tempRastName, tempArray, minY, minX)
+        #insertTime = self.InsertRedimension(tempRastName, tempArray, minY, minX)
 
         dimName = thedimensions[0].split("=")[0]
         start = timeit.default_timer()
@@ -447,7 +447,7 @@ class ZonalStats(object):
         #self.sdb.query("remove(%s)" % tempArray)
         #self.sdb.query("remove(%s)" % tempRastName)
 
-        return insertTime, queryTime
+        return iqueryTime
 
     def JoinReclass(self, SciDBArray, tempRastName, tempArray,  minY, minX, maxY, maxX, thedimensions, reclassText, theband=0, outcsv=None):
         """
