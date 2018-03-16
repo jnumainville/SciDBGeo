@@ -484,6 +484,74 @@ def ParamSeperator(inParams):
 
     return x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath
 
+def BigRasterization(inParams):
+    """
+    Function for rasterizing in parallel
+    """
+    from SciDBGDAL import world2Pixel, Pixel2world
+    from osgeo import ogr, gdal
+    import numpy as np
+    import os
+    # print("Rasterizing Vector in Parallel")
+
+    x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(inParams)
+    # print(offset, x, y)
+    outTransform= [x, pixel_1, 0, y, 0, pixel_2 ]
+    memDriver = gdal.GetDriverByName('MEM')
+
+    vector_dataset = ogr.Open(vectorPath)
+    theLayer = vector_dataset.GetLayer()
+
+    #Generate an array of elements the length of raster height
+    hdataset = np.arange(height)
+    if height * width > 5000000:
+        #This is the very big rasterization process
+        for p, h in enumerate(np.array_split(hdataset,10)):
+            #h min is the minimum offset value
+            colX, colY = world2Pixel(outTransform, x, y + h.min())
+            memX, memY = Pixel2world(outTransform, colX, colY)
+            print("Node: %s, partition number: %s y: %s, x: %s, height: %s " % (counter, p, memY, memX, height))
+            #Out Transform will change with the step
+            memTransform = [memX, pixel_1, 0, memY, 0, pixel_2 ]
+            #Height changes
+            theRast = memDriver.Create('', width, len(h), 1, gdal.GDT_Int32) #gdal.GDT_Int16
+              
+            theRast.SetProjection(projection)
+            theRast.SetGeoTransform(memTransform)
+            
+            band = theRast.GetRasterBand(1)
+            band.SetNoDataValue(-999)
+
+            #If you want to use another shapefile field you need to change this line
+            gdal.RasterizeLayer(theRast, [1], theLayer, options=["ATTRIBUTE=ID"])
+            
+            bandArray = band.ReadAsArray()
+            del theRast
+            print(bandArray.shape)
+
+            binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
+            ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset + h.min())
+    else:
+
+        theRast = memDriver.Create('', width, height, 1, gdal.GDT_Int32) #gdal.GDT_Int16
+          
+        theRast.SetProjection(projection)
+        theRast.SetGeoTransform(outTransform)
+        
+        band = theRast.GetRasterBand(1)
+        band.SetNoDataValue(-999)
+    
+        #If you want to use another shapefile field you need to change this line
+        gdal.RasterizeLayer(theRast, [1], theLayer, options=["ATTRIBUTE=ID"])
+        
+        bandArray = band.ReadAsArray()
+        del theRast
+
+        binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
+        ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset) 
+   
+    return counter, offset, bandArray, binaryPartitionPath
+    
 def Rasterization(inParams):
     """
     Function for rasterizing in parallel
@@ -522,11 +590,10 @@ def Rasterization(inParams):
     if c*r > 5000000:
         #from SciDBParallel import RasterReader
         from scidb import Statements, iquery
-        print("Instance: %s and initial offset %s with array size: %s" % (counter, offset, bandArray.shape))
+        print("SciDB Instance: %s and initial offset %s with array size: %s" % (counter, offset, bandArray.shape))
         #bigRaster = RasterReader(bandArray, 'mask', 'id', 500, 8, offset)
         #for x in bigRaster.RasterReadingData:
         #    print(counter, bigRaster.RasterReadingData[x])
-        
 
         sdbConnection = iquery()
         sdbStatements = Statements(sdbConnection)
@@ -566,7 +633,7 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
     import numpy as np
     # print("Writing out file: %s" % (binaryFilePath))
     col, row = theArray.shape
-    with open(binaryFilePath, 'wb') as fileout:
+    with open(binaryFilePath, 'ab') as fileout:
         #Oneliner that creates the column index. Pull out [y for y in range(col)] to see how it works
         column_index = np.array(np.repeat([y for y in np.arange(0+yOffSet, col+yOffSet) ], row), dtype=np.dtype('int64'))
         
@@ -610,7 +677,7 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
 
     """
 
-    bigRaster = RasterizationDecider(coordinateData, theRasterClass)
+    bigRaster = BigRasterizationDecider(coordinateData, theRasterClass)
   
 
     pool = mp.Pool(len(coordinateData))
