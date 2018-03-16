@@ -447,7 +447,7 @@ class ZonalStats(object):
         #self.sdb.query("remove(%s)" % tempArray)
         #self.sdb.query("remove(%s)" % tempRastName)
 
-        return iqueryTime
+        return queryTime
 
     def JoinReclass(self, SciDBArray, tempRastName, tempArray,  minY, minX, maxY, maxX, thedimensions, reclassText, theband=0, outcsv=None):
         """
