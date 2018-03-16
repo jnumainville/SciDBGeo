@@ -15,7 +15,7 @@ def datasetsprep():
     chunk_sizes = [500]#, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
     raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006.tif"]
-    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
+    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp"] #,"/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
     rasterPaths =  [ raster_path for raster_path in raster_paths for chunk in chunk_sizes ]
@@ -56,20 +56,23 @@ if __name__ == '__main__':
         for r in runs:
             start = timeit.default_timer()
             
-            raster = ZonalStats(d["raster_path"], d["shape_path"], d["array_table"])
+            raster = ZonalStats(d["shape_path"], d["raster_path"], d["array_table"])
             raster.RasterMetadata(d["raster_path"], d["shape_path"], raster.SciDBInstances, '/storage' ) 
             stopPrep = timeit.default_timer()
+            print(raster.geoTiffPath, raster.SciDBArrayName)
 
-            datapackage = ParallelRasterization(raster.arrayMetaData)
+            datapackage, bigRaster = ParallelRasterization(raster.arrayMetaData, raster)
             stopRasterization = timeit.default_timer()
             
-            sdb_statements = Statements(sdb)
+            if not bigRaster:
+                sdb_statements = Statements(sdb)
             
-            theAttribute = 'id:%s' % (datapackage[0]) #
-            sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
-            sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
-            #Load operator -1 in parallel
-            numDimensions = raster.CreateMask(datapackage[0], 'mask')
+                theAttribute = 'id:%s' % (datapackage[0]) #
+                sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
+                sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
+                #Load operator -1 in parallel
+                numDimensions = raster.CreateMask(datapackage[0], 'mask')
+
             redimension_time, summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, rasterStatsCSV)
             stopSummaryStats = timeit.default_timer()            
 
@@ -78,6 +81,7 @@ if __name__ == '__main__':
             timings[analytic] = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("SciDB_Executors", raster.SciDBInstances), ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]), ("full_time", stopSummaryStats-start), ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep) ])
             sdb.query("remove(mask)")
             sdb.query("remove(boundary)")
+            del raster
 
     if filePath: WriteFile(filePath, timings)
     print("Finished")

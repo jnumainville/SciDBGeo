@@ -1,7 +1,7 @@
-import timeit, itertools
+import timeit, itertools, csv, math
 import multiprocessing as mp
 import numpy as np
-import csv
+from collections import OrderedDict
 
 class RasterReader(object):
 
@@ -13,7 +13,7 @@ class RasterReader(object):
         self.width, self.height, self.datatype, self.numbands = self.GetRasterDimensions(RasterPath)
         self.AttributeNames = attribute
         self.AttributeString, self.RasterArrayShape = self.RasterShapeLogic(attribute)
-        self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, self.AttributeString, self.numbands )
+        self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, attribute=self.AttributeString, band=self.numbands )
         
     def RasterShapeLogic(self, attributeNames):
         """
@@ -53,7 +53,7 @@ class RasterReader(object):
         """
         Function gets the dimensions of the raster file 
         """
-        if type(thePath) == string:
+        if isinstance(thePath,str):
             raster = gdal.Open(thePath, GA_ReadOnly)
     
             if raster.RasterCount > 1:
@@ -76,7 +76,7 @@ class RasterReader(object):
         
         elif type(thePath).__module__ == 'numpy':
             rasterValueDataType = thePath.dtype
-            height, width = thePaths.shape
+            height, width = thePath.shape
             numbands = 1
 
         return (width, height, rasterValueDataType, numbands)
@@ -112,7 +112,7 @@ class RasterReader(object):
                     ("attribute", attribute), ("scidbArray", theArray), ("y_version", y_version), ("chunk", chunk), ("bands", band) ])
 
             
-            rowMax += math.ceil(vwidthMax/(chunk*tiles))
+            rowMax += math.ceil(widthMax/(chunk*tiles))
 
         for r in RasterReads.keys():
             RasterReads[r]["loops"] = len(RasterReads)
@@ -298,14 +298,14 @@ class ZonalStats(object):
         #print("Rows between %s" % (tlY-lrY))
         
         step = int(abs(self.tlY-self.lrY)/instances)
-        print("Each partition will have approximately %s lines" % (step))
+        print("Each partition array dimensionsa are approximately %s lines, %s columns = %s pixels" % (step,self.width, step*self.width))
         self.arrayMetaData = []
 
         top = self.tlY
         for i in range(instances):
             if top+step <= self.lrY and i < instances-1:
                 topPixel = top
-                # print("top pixel: %s" % (topPixel) )                
+                print("top pixel: %s" % (topPixel) )                
                 self.height = step
             elif top+step <= self.lrY and i == instances-1:
                 topPixel = top
@@ -490,6 +490,7 @@ def Rasterization(inParams):
     """
     from osgeo import ogr, gdal
     import numpy as np
+    import os
     # print("Rasterizing Vector in Parallel")
 
     x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(inParams)
@@ -518,18 +519,38 @@ def Rasterization(inParams):
     #ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)    
     c, r = bandArray.shape
 
-    if c*r > 50000000:
-        from SciDBParallel import ZonalStats import RasterReader
-        bigRaster = RasterReader(bandArray, 'mask', 'id', chunksize, tiles, yOffSet):
-        print("Number of pixels: %s" % (c*r))
+    if c*r > 5000000:
+        #from SciDBParallel import RasterReader
+        from scidb import Statements, iquery
+        print("Instance: %s and initial offset %s with array size: %s" % (counter, offset, bandArray.shape))
+        #bigRaster = RasterReader(bandArray, 'mask', 'id', 500, 8, offset)
+        #for x in bigRaster.RasterReadingData:
+        #    print(counter, bigRaster.RasterReadingData[x])
+        
 
-        for x in bigRaster.RasterReadingData:
-            print(x)
-            quit()
-        # with open(binaryPartitionPath, 'wb') as fileout:
-        #     for partitionBandArray in np.array_split(bandArray, 10, axis=0):
-        #         ArrayToBinary(partitionBandArray, binaryPartitionPath, 'mask', offset)
-        #         yOffSet += partitionBandArray.shape[0] + offset
+        sdbConnection = iquery()
+        sdbStatements = Statements(sdbConnection)
+                
+        yOffSet = offset
+        for partitions, partitionBandArray in enumerate(np.array_split(bandArray, 10, axis=0)):
+             outName = "junk_%s_%s" % (counter, partitions)
+             outFileDir = "/".join(binaryPartitionPath.split('/')[:-1])
+             sdbStatements.CreateLoadArray(outName, 'id:int32', 2)
+             outFilePath = "/%s/%s.sdb" % ('mnt', outName)
+             #print(outFilePath)
+
+             ArrayToBinary(partitionBandArray, outFilePath, 'mask', yOffSet)
+           
+             loadPath = "/data/04489/dhaynes/%s.sdb" % (outName)
+             sdbStatements.LoadOneDimensionalArray( counter, outName, 'id:int32', 1, loadPath)
+             print("Redimension node: %s, Array Partition: %s, offset: %s" %(counter,partitions, yOffSet))
+             query = "insert(redimension(apply({A}, x, x1, y, y1, value, id), {B} ), {B})".format( A=outName, B='mask')
+
+             sdbConnection.query(query)
+             os.remove(outFilePath)
+             sdbConnection.queryAFL("remove(%s)" % (outName))
+             yOffSet += partitionBandArray.shape[0]
+
     else:
         ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)  
     
@@ -560,7 +581,7 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
     
     del column_index, row_index, theArray
 
-def RasterizationDecider(theRasterizationMetaData):
+def RasterizationDecider(theRasterizationMetaData, theRasterClass):
     """
     This function will determine if the rasterization can use the parallel load or another strategy
     """
@@ -574,23 +595,24 @@ def RasterizationDecider(theRasterizationMetaData):
 
     largestRasterization = max(maxRasterizationPixels)
 
-    if largestRasterization > 50000000:
-        pass
+    if largestRasterization > 5000000:
+        
         #Create mask array
-        numDimensions = raster.CreateMask('int32', 'mask') #This is hardcoded for int32
-    else:
+        numDimensions = theRasterClass.CreateMask('int32', 'mask') #This is hardcoded for int32
         return 1
+    else:
+        return 0
 
 
 
-def ParallelRasterization(coordinateData):
+def ParallelRasterization(coordinateData, theRasterClass=None):
     """
 
     """
 
-    RasterizationDecider(coordinateData)
+    bigRaster = RasterizationDecider(coordinateData, theRasterClass)
   
-    #if decision == 1:
+
     pool = mp.Pool(len(coordinateData))
 
     try:
@@ -605,6 +627,6 @@ def ParallelRasterization(coordinateData):
         for datastore, offset, array, resultPath in arrayData:
             # print(datastore, offset, array.shape, resultPath, array.dtype)
             arraydatatypes.append(array.dtype)
-        return arraydatatypes
+        return (arraydatatypes,bigRaster)
 
 
