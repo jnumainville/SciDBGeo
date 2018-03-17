@@ -76,15 +76,15 @@ if __name__ == '__main__':
 
             summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, rasterStatsCSV)
             stopSummaryStats = timeit.default_timer()            
-
-            analytic += 1
-            for i in range(raster.SciDBInstances):
-                os.remove("/storage/%s/p_zones.scidb" % (i))
-
+            
             timings[analytic] = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("SciDB_Executors", raster.SciDBInstances), ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]), ("full_time", stopSummaryStats-start), ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep) ])
             sdb.query("remove(mask)")
             sdb.query("remove(boundary)")
             del raster
+            analytic += 1
+
+        for i in range(raster.SciDBInstances):
+            os.remove("/storage/%s/p_zones.scidb" % (i))
 
     if filePath: WriteFile(filePath, timings)
     print("Finished")
