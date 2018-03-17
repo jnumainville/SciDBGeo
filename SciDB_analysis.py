@@ -46,7 +46,7 @@ if __name__ == '__main__':
     sdb = iquery()
     runs = [1]#,2,3]
     analytic = 0
-    filePath = '' #mnt/zonal_stats_3_9_2018_4_executors.csv'
+    filePath = 'mnt/zonal_stats_3_16_2018_all.csv'
     timings = OrderedDict()
     rasterStatsCSV = ''
 
@@ -61,27 +61,29 @@ if __name__ == '__main__':
             stopPrep = timeit.default_timer()
             print(raster.geoTiffPath, raster.SciDBArrayName)
 
-            datapackage, bigRaster = ParallelRasterization(raster.arrayMetaData, raster)
+            datapackage = ParallelRasterization(raster.arrayMetaData, raster)
             stopRasterization = timeit.default_timer()
             
-            if not bigRaster:
-                sdb_statements = Statements(sdb)
             
-                theAttribute = 'id:%s' % (datapackage[0]) #
-                sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
-                sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
-                #SciDB Load operator -1 loads in parallel
-                numDimensions = raster.CreateMask(datapackage[0], 'mask')
-                redimension_time = raster.InsertRedimension( 'boundary', 'mask', raster.tlY, raster.tlX )
+            sdb_statements = Statements(sdb)
+            
+            theAttribute = 'id:%s' % (datapackage[0]) #
+            sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
+            sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
+            #SciDB Load operator -1 loads in parallel
+            numDimensions = raster.CreateMask(datapackage[0], 'mask')
+            redimension_time = raster.InsertRedimension( 'boundary', 'mask', raster.tlY, raster.tlX )
 
             summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, rasterStatsCSV)
             stopSummaryStats = timeit.default_timer()            
 
             analytic += 1
+            for i in range(raster.SciDBInstances):
+                os.remove("/storage/%s/p_zones.scidb" % (i))
 
             timings[analytic] = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("SciDB_Executors", raster.SciDBInstances), ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]), ("full_time", stopSummaryStats-start), ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep) ])
             sdb.query("remove(mask)")
-            if not bigRaster: sdb.query("remove(boundary)")
+            sdb.query("remove(boundary)")
             del raster
 
     if filePath: WriteFile(filePath, timings)

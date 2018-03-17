@@ -508,9 +508,9 @@ def BigRasterization(inParams):
         #This is the very big rasterization process
         for p, h in enumerate(np.array_split(hdataset,10)):
             #h min is the minimum offset value
-            colX, colY = world2Pixel(outTransform, x, y + h.min())
-            memX, memY = Pixel2world(outTransform, colX, colY)
-            print("Node: %s, partition number: %s y: %s, x: %s, height: %s " % (counter, p, memY, memX, height))
+            colX, colY = world2Pixel(outTransform, x, y)
+            memX, memY = Pixel2world(outTransform, colX, colY + h.min())
+            # print("Node: %s, partition number: %s y: %s, x: %s, height: %s " % (counter, p, memY, memX, height))
             #Out Transform will change with the step
             memTransform = [memX, pixel_1, 0, memY, 0, pixel_2 ]
             #Height changes
@@ -526,8 +526,9 @@ def BigRasterization(inParams):
             gdal.RasterizeLayer(theRast, [1], theLayer, options=["ATTRIBUTE=ID"])
             
             bandArray = band.ReadAsArray()
+            print("Node: %s, partition number: %s y: %s, x: %s, height: %s, arrayshape: %s " % (counter, p, memY, memX, height, bandArray.shape ))
             del theRast
-            print(bandArray.shape)
+           
 
             binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
             ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset + h.min())
@@ -677,7 +678,7 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
 
     """
 
-    bigRaster = RasterizationDecider(coordinateData, theRasterClass)
+    bigRaster = 0 #RasterizationDecider(coordinateData, theRasterClass)
   
 
     pool = mp.Pool(len(coordinateData))
@@ -694,6 +695,6 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
         for datastore, offset, array, resultPath in arrayData:
             # print(datastore, offset, array.shape, resultPath, array.dtype)
             arraydatatypes.append(array.dtype)
-        return (arraydatatypes,bigRaster)
+        return (arraydatatypes)
 
 
