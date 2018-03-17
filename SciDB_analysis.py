@@ -60,10 +60,10 @@ if __name__ == '__main__':
             raster.RasterMetadata(d["raster_path"], d["shape_path"], raster.SciDBInstances, '/storage' ) 
             stopPrep = timeit.default_timer()
             print(raster.geoTiffPath, raster.SciDBArrayName)
-
-            datapackage = ParallelRasterization(raster.arrayMetaData, raster)
-            stopRasterization = timeit.default_timer()
             
+            if r == 1:
+                datapackage = ParallelRasterization(raster.arrayMetaData, raster)
+                stopRasterization = timeit.default_timer()
             
             sdb_statements = Statements(sdb)
             

@@ -504,9 +504,9 @@ def BigRasterization(inParams):
 
     #Generate an array of elements the length of raster height
     hdataset = np.arange(height)
-    if height * width > 5000000:
+    if height * width > 50000000:
         #This is the very big rasterization process
-        for p, h in enumerate(np.array_split(hdataset,10)):
+        for p, h in enumerate(np.array_split(hdataset,20)):
             #h min is the minimum offset value
             colX, colY = world2Pixel(outTransform, x, y)
             memX, memY = Pixel2world(outTransform, colX, colY + h.min())
