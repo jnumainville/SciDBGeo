@@ -12,10 +12,10 @@ def datasetsprep():
     """
     
 
-    chunk_sizes = [500]#, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+    chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
     raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006.tif"]
-    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp"] #,"/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
+    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
     rasterPaths =  [ raster_path for raster_path in raster_paths for chunk in chunk_sizes ]
@@ -44,9 +44,9 @@ def WriteFile(filePath, theDictionary):
 if __name__ == '__main__':
 
     sdb = iquery()
-    runs = [1]#,2,3]
-    analytic = 0
-    filePath = 'mnt/zonal_stats_3_16_2018_all.csv'
+    runs = [1,2,3]
+    analytic = 1
+    filePath = '/mnt/zonal_stats_3_18_2018_all.csv'
     timings = OrderedDict()
     rasterStatsCSV = ''
 
@@ -64,6 +64,7 @@ if __name__ == '__main__':
             if r == 1:
                 datapackage = ParallelRasterization(raster.arrayMetaData, raster)
                 stopRasterization = timeit.default_timer()
+                SciDBInstances = raster.SciDBInstances
             
             sdb_statements = Statements(sdb)
             
@@ -83,7 +84,7 @@ if __name__ == '__main__':
             del raster
             analytic += 1
 
-        for i in range(raster.SciDBInstances):
+        for i in range(SciDBInstances):
             os.remove("/storage/%s/p_zones.scidb" % (i))
 
     if filePath: WriteFile(filePath, timings)
