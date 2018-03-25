@@ -80,7 +80,7 @@ class iquery(object):
         return theCSVPath
         
     def aql_query(self, theQuery):
-        scidbArguments = """iquery -c "%s";""" % (theQuery)
+        scidbArguments = """iquery -q "%s";""" % (theQuery)
         #print(scidbArguments)
         p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
         p.wait()
