@@ -48,7 +48,8 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     
     start = timeit.default_timer()
     query = "SELECT count(value) from %s WHERE value = %s" % (arrayTable, pixelValue)
-    sdb.aql_query(query)
+    results = sdbConn.aql_query(query)
+    print("Sum of pixel values %s" % (results.splitlines()[-1]) )
     stop = timeit.default_timer()
     timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start) ])
 
@@ -97,12 +98,14 @@ def argument_parser():
     import argparse
 
     parser = argparse.ArgumentParser(description= "Analysis Script for running SciDB Analytics")    
-    # parser.add_argument("-Instances", required=False, nargs='*', type=int, help="Number of SciDB Instances for parallel data loading", dest="instances", default=[0,1])    
-    #parser.add_argument("-Host", required=True, help="SciDB host for connection", dest="host", default="localhost")
-    #If host = NoSHIM, then use the cmd iquery   
+   
     analytic = parser.add_mutually_exclusive_group(required = True)
     analytic.add_argument('-zonal', action='store_true', dest='zonal')
+    
     analytic.add_argument('-count', action='store_true', dest='count')
+    count_subparser = parser.add_subparsers(help='sub-command help', dest='pixelValue')
+    #count_pixelValue = count_subparser.add_parser('-p', type=int,  help='pixel value')
+    
     analytic.add_argument('-reclassify', action='store_true', dest='reclassify')
 
     #parser.add_argument("-r", required=True, help="Input file path for the raster", dest="rasterPath")    
@@ -122,9 +125,12 @@ if __name__ == '__main__':
     args = argument_parser().parse_args()
     
     sdb = iquery()
+    query = sdb.queryAFL("list('instances')")
+    SciDBInstances = len(query.splitlines())-1
+
     runs = [1,2,3]
     analytic = 1
-    filePath = '/mnt/zonal_stats_3_20_2018_all.csv'
+    filePath = '/mnt/pixel_count_s3_24_2018_all.csv'
     rasterStatsCSV = ''
 
     datasets = datasetsprep()
@@ -137,7 +143,7 @@ if __name__ == '__main__':
                 timed = ZonalStatistics(d, r)
                 timings[r] = timed
             elif args.count:
-                timed = CountPixels(sdb, d["array_table"], thePixel)
+                timed = CountPixels(sdb, d["array_table"], 13)
                 timings[r] = timed
 
             elif args.reclassify:
