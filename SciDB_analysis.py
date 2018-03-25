@@ -46,7 +46,7 @@ if __name__ == '__main__':
     sdb = iquery()
     runs = [1,2,3]
     analytic = 1
-    filePath = '/mnt/zonal_stats_3_18_2018_all.csv'
+    filePath = '/mnt/zonal_stats_3_20_2018_all.csv'
     timings = OrderedDict()
     rasterStatsCSV = ''
 
