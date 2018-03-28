@@ -16,7 +16,7 @@ class RasterLoader(object):
         self.AttributeNames = attribute
         self.GetSciDBInstances()
         self.AttributeString, self.RasterArrayShape = self.RasterShapeLogic(attribute)
-        
+        self.chunksize = chunksize
         hdataset = np.arange(self.height)
 
         self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange), "height": len(heightRange), "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
@@ -97,7 +97,57 @@ class RasterLoader(object):
             numbands = 1
 
         return (width, height, rasterValueDataType, numbands)
+
+    def CreateDestinationArray(self, rasterArrayName, height, width, chunk):
+        """
+        Function creates the final destination array.
+        Updated to handle 3D arrays.
+        """
+        
+        import scidb
+        sdb = scidb.iquery()
+        
+        
+        if self.RasterArrayShape <= 2:
+            #sdb.query("create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk) )
+            myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
+        else:
+            #sdb.query("create array %s <%s> [band=0:%s,1; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , len(self.datatype)-1, height-1, chunk, width-1, chunk) )
+            myQuery = "create array %s <%s> [band=0:%s,1,0; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, width-1, chunk)
+        
+        try:
+            #print(myQuery)
+            sdb.query(myQuery)
+            #print("Created array %s" % (rasterArrayName))
+        except:
+            print("*****  Array %s already exists. Removing ****" % (rasterArrayName))
+            sdb.query("remove(%s)" % (rasterArrayName))
+            sdb.query(myQuery)
+            #sdb.query("create array %s <%s:%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString, height-1, chunk, width-1, chunk) )
+
+        del sdb 
     
+    def CreateLoadArray(tempRastName, attribute_name, rasterArrayType):
+        """
+        Create the loading array
+        """
+        
+        import scidb
+        sdb = scidb.iquery()
+
+        if rasterArrayType <= 2:
+            theQuery = "create array %s <y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
+        elif rasterArrayType == 3:
+            theQuery = "create array %s <z1:int64, y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
+        
+        try:
+            #print(theQuery)
+            sdb.query(theQuery)
+            #sdb.query("create array %s <y1:int64, x1:int64, %s:%s> [xy=0:*,?,?]" % (tempRastName, attribute_name, rasterValueDataType) )
+        except:
+            #Silently deleting temp arrays
+            sdb.query("remove(%s)" % (tempRastName))
+            sdb.query(theQuery)
 
     def CreateArrayMetadata(self, theArray, widthMax, heightMax, widthMin=0, heightMin=0, chunk=1000, tiles=1, attribute='value', band=1):
         """
@@ -384,12 +434,12 @@ class ZonalStats(object):
 
         return thedimensions
 
-    def InsertRedimension(self, tempRastName, tempArray, minY, minX):
+    def InsertRedimension(self, tempRastName, destArray, minY, minX):
         """
         First part inserts the boundary array into larger global mask array
         """
         start = timeit.default_timer()
-        sdbquery ="insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format( A=tempRastName, B=tempArray, yOffSet=minY, xOffSet=minX)
+        sdbquery ="insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format( A=tempRastName, B=destArray, yOffSet=minY, xOffSet=minX)
         self.sdb.query(sdbquery)
         stop = timeit.default_timer()
         insertTime = stop-start
@@ -557,7 +607,7 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
 
     """
 
-    bigRaster = 0 #RasterizationDecider(coordinateData, theRasterClass)
+    #bigRaster = 0 #RasterizationDecider(coordinateData, theRasterClass)
   
 
     pool = mp.Pool(len(coordinateData))
