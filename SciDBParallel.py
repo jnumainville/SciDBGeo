@@ -662,7 +662,7 @@ def Read_Write_Raster(rDict):
     raster = gdal.Open(rDict["filepath"], GA_ReadOnly)
 
     binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
-    print(binaryPartitionPath)
+    #print(binaryPartitionPath)
     if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
     
     
@@ -671,10 +671,13 @@ def Read_Write_Raster(rDict):
         hdataset = np.arange(rDict["height"])
         yOffSet = int(rDict["y_min"])
         
-        for h in np.array_split(hdataset,20):
+        for l, h in enumerate(np.array_split(hdataset,20)):
             rArray = raster.ReadAsArray(xoff=0, yoff=yOffSet, xsize=rDict["width"], ysize=len(h))
-            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet)
-            yOffSet += len(h)
+            arrayHeight, arrayWidth  = rArray.shape
+            
+            print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet+min(h) ))
+            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet + min(h))
+            
     else:
         
         rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict["y_min"]), xsize=rDict["width"], ysize=rDict["height"])

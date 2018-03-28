@@ -48,9 +48,12 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     
     start = timeit.default_timer()
     query = "SELECT count(value) from %s WHERE value = %s" % (arrayTable, pixelValue)
+    
     results = sdbConn.aql_query(query)
-    print("Sum of pixel values %s for array: %s" % (results.splitlines()[-1], arrayTable) )
     stop = timeit.default_timer()
+    pixelCount = str(results.splitlines()[-1])
+    print("Sum of pixel values %s for array: %s" % (pixelCount.split(" ")[-1],arrayTable) )
+    
     timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable) ])
 
     return timed
@@ -60,23 +63,23 @@ def localDatasetPrep():
 
     """
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
-    raster_tables = ["glc_2000_clipped", "meris_2015_clipped", "nlcd_2006"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
+    raster_tables = ["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
     
     
 
-    rasterTables =  [ "%s_%s" % (raster, chunk) for raster in raster_tables for chunk in chunksizes ]
+    rasterTables =  [ "%s_%s" % (raster, chunk) for raster in raster_tables for chunk in chunk_sizes ]
     datasetRuns = []
     for r in rasterTables:
         if "glc_2000_clipped" in r: 
             pixelValue = 16
             reclassValues = {"oldPixel" : 16, "newPixel" : 1 }
-        elif "meris_2015_clipped" in r:
+        elif "meris_2010_clipped" in r:
             pixelValue = 100
             reclassValues = {"oldPixel" : 100, "newPixel" : 1 }
         elif "nlcd_2006" in r:
             pixelValue = 21
             reclassValues = {"oldPixel" : 21, "newPixel" : 1 }
-        datasetRuns.append(  OrderedDict([ ("raster_table", r), ("pixelValue", pixelValue), ("newPixel", 1) ]) )
+        datasetRuns.append(  OrderedDict([ ("array_table", r), ("pixelValue", pixelValue), ("newPixel", 1) ]) )
 
     return datasetRuns
 
@@ -125,7 +128,7 @@ def argument_parser():
     parser = argparse.ArgumentParser(description= "Analysis Script for running SciDB Analytics")  
     parser.add_argument("-csv", required =False, help="Output timing results into CSV file", dest="csv", default="None")  
    
-    subparser = parser.add_subparsersp(required = True, dest="command")
+    subparser = parser.add_subparsers(dest="command")
     analytic_subparser = subparser.add_parser('zonal')
     analytic_subparser.set_defaults(func=zonalDatasetPrep)
     
@@ -153,6 +156,7 @@ if __name__ == '__main__':
     timings = OrderedDict()
     
     for d in datasets:
+        print(d)
         for r in runs:
             if args.command == "zonal":                  
                 print(d["raster_path"], d["shape_path"], d["array_table"])

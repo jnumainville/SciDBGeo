@@ -4,11 +4,11 @@ from scidb import iquery, Statements
 
 if __name__ == '__main__':
         datasets = {
-                      "glc": {"geoTiffPath": "/home/04489/dhaynes/glc2000_clipped.tif", "arrayName": "glc_2000_clipped", "attribute": "value", "outDirectory": "/storage"}, 
-                      "meris": {"geoTiffPath": "/home/04489/dhaynes/meris_2010_clipped.tif", "arrayName": "meris_2010_clipped", "attribute": "value", "outDirectory": "/storage"},
+                      #"glc": {"geoTiffPath": "/home/04489/dhaynes/glc2000_clipped.tif", "arrayName": "glc_2000_clipped", "attribute": "value", "outDirectory": "/storage"}, 
+                     #"meris": {"geoTiffPath": "/home/04489/dhaynes/meris_2010_clipped.tif", "arrayName": "meris_2010_clipped", "attribute": "value", "outDirectory": "/storage"},
                       "nlcd": {"geoTiffPath": "/home/04489/dhaynes/nlcd_2006.tif", "arrayName": "nlcd_2006",  "attribute": "value", "outDirectory": "/storage"}
                     }
-        tileSizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+        tileSizes = [500]#, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
         sdb = iquery()
         for d in datasets:
                 print(datasets[d])
