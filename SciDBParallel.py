@@ -2,18 +2,25 @@ import timeit, itertools, csv, math
 import multiprocessing as mp
 import numpy as np
 from collections import OrderedDict
+from osgeo import gdal
+from gdalconst import GA_ReadOnly
 
-class RasterReader(object):
+class RasterLoader(object):
 
-    def __init__(self, RasterPath, scidbArray, attribute, chunksize, tiles, yOffSet):
+    def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, yOffSet=None):
         """
         Initialize the class RasterReader
         """
         
         self.width, self.height, self.datatype, self.numbands = self.GetRasterDimensions(RasterPath)
         self.AttributeNames = attribute
+        self.GetSciDBInstances()
         self.AttributeString, self.RasterArrayShape = self.RasterShapeLogic(attribute)
-        self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, attribute=self.AttributeString, band=self.numbands )
+        
+        hdataset = np.arange(self.height)
+
+        self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange), "height": len(heightRange), "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
+        #self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, attribute=self.AttributeString, band=self.numbands )
         
     def RasterShapeLogic(self, attributeNames):
         """
@@ -36,6 +43,16 @@ class RasterReader(object):
             arrayType = 1
             
         return (attString, arrayType)
+
+    def GetSciDBInstances(self):
+        """
+
+        """
+        from scidb import iquery
+        sdb = iquery()
+        #query = sdb.queryAFL("list('instances')")
+        #self.SciDBInstances = len(query.splitlines())-1
+        self.SciDB_Instances = 12
             
             
     def GetMetadata(self, scidbInstances, rasterFilePath, outPath, loadPath,  band):
@@ -325,52 +342,6 @@ class ZonalStats(object):
                 vectorPath, i, offset, dataStorePath))
 
 
-    def SciDBZonalStats(self,rasterizedArray):
-        """
-        This is the full parallel mode of zonal statistics
-        """
-        # print("Parallel Version of Zonal Stats")
-        
-
-        # print("Partitioning Array")
-        start = timeit.default_timer()
-        chunkedArrays = np.array_split(rasterizedArray, 2, axis=0)
-        stop = timeit.default_timer()
-        # print("Took: %s" % (stop-start))
-
-        #This is super ugly, but I can't think of the one liner!
-        allColumns = [c.shape[0] for c in chunkedArrays]
-        yOffSet = [0]
-        z = 0
-        for c in allColumns:
-            z += c
-            yOffSet.append(z)
-        #Remove the last item 
-        yOffSet.pop()
-
-        the_binaryPath = '%s' % (self.binaryPath)
-        print("Converting to Binary and Writing Files in Parallel")
-        start = timeit.default_timer()
-        try:
-            results = self.pool.imap(self.ParallelProcessing, zip( itertools.repeat(the_binaryPath), itertools.cycle(yOffSet), ((p, chunk) for p, chunk in enumerate(chunkedArrays))  )    )
-        #results = pool.imap(ParallelProcessing,  (chunk for  chunk in chunkedArrays)     )
-        except Exception as e:
-            print(e)
-        self.pool.close()
-        self.pool.join()
-        stop = timeit.default_timer()
-        print("Took: %s" % (stop-start))            
-        
-        # print("Loading...")
-        # start = timeit.default_timer()
-        # binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0'  #binaryPartitionPath.split("/")[-1]
-        # LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
-        # stop = timeit.default_timer()
-        # print("Took: %s" % (stop-start))
-        
-        # transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName, ulY, ulX, lrY, lrX, verbose)
-
-
     def CreateMask(self, rasterValueDataType, tempArray='mask'):
         """
         Create an empty raster "Mask "that matches the SciDBArray
@@ -492,7 +463,7 @@ def BigRasterization(inParams):
     from osgeo import ogr, gdal
     import numpy as np
     import os
-    # print("Rasterizing Vector in Parallel")
+    #print("Rasterizing Vector in Parallel")
 
     x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(inParams)
     # print(offset, x, y)
@@ -553,76 +524,6 @@ def BigRasterization(inParams):
    
     return counter, offset, bandArray, binaryPartitionPath
     
-def Rasterization(inParams):
-    """
-    Function for rasterizing in parallel
-    """
-    from osgeo import ogr, gdal
-    import numpy as np
-    import os
-    # print("Rasterizing Vector in Parallel")
-
-    x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(inParams)
-    # print(offset, x, y)
-    outTransform= [x, pixel_1, 0, y, 0, pixel_2 ]
-    
-    memDriver = gdal.GetDriverByName('MEM')
-    theRast = memDriver.Create('', width, height, 1, gdal.GDT_Int32) #gdal.GDT_Int16
-      
-    theRast.SetProjection(projection)
-    theRast.SetGeoTransform(outTransform)
-    
-    band = theRast.GetRasterBand(1)
-    band.SetNoDataValue(-999)
-    
-    vector_dataset = ogr.Open(vectorPath)
-    theLayer = vector_dataset.GetLayer()
-
-    #If you want to use another shapefile field you need to change this line
-    gdal.RasterizeLayer(theRast, [1], theLayer, options=["ATTRIBUTE=ID"])
-    
-    bandArray = band.ReadAsArray()
-    del theRast
-
-    binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
-    #ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)    
-    c, r = bandArray.shape
-
-    if c*r > 5000000:
-        #from SciDBParallel import RasterReader
-        from scidb import Statements, iquery
-        print("SciDB Instance: %s and initial offset %s with array size: %s" % (counter, offset, bandArray.shape))
-        #bigRaster = RasterReader(bandArray, 'mask', 'id', 500, 8, offset)
-        #for x in bigRaster.RasterReadingData:
-        #    print(counter, bigRaster.RasterReadingData[x])
-
-        sdbConnection = iquery()
-        sdbStatements = Statements(sdbConnection)
-                
-        yOffSet = offset
-        for partitions, partitionBandArray in enumerate(np.array_split(bandArray, 10, axis=0)):
-             outName = "junk_%s_%s" % (counter, partitions)
-             outFileDir = "/".join(binaryPartitionPath.split('/')[:-1])
-             sdbStatements.CreateLoadArray(outName, 'id:int32', 2)
-             outFilePath = "/%s/%s.sdb" % ('mnt', outName)
-             #print(outFilePath)
-
-             ArrayToBinary(partitionBandArray, outFilePath, 'mask', yOffSet)
-           
-             loadPath = "/data/04489/dhaynes/%s.sdb" % (outName)
-             sdbStatements.LoadOneDimensionalArray( counter, outName, 'id:int32', 1, loadPath)
-             print("Redimension node: %s, Array Partition: %s, offset: %s" %(counter,partitions, yOffSet))
-             query = "insert(redimension(apply({A}, x, x1, y, y1, value, id), {B} ), {B})".format( A=outName, B='mask')
-
-             sdbConnection.query(query)
-             os.remove(outFilePath)
-             sdbConnection.queryAFL("remove(%s)" % (outName))
-             yOffSet += partitionBandArray.shape[0]
-
-    else:
-        ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)  
-    
-    return counter, offset, bandArray, binaryPartitionPath
 
 def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
     """
@@ -648,28 +549,6 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
 
     
     del column_index, row_index, theArray
-
-def RasterizationDecider(theRasterizationMetaData, theRasterClass):
-    """
-    This function will determine if the rasterization can use the parallel load or another strategy
-    """
-    rasterTotalPixels = 0
-    maxRasterizationPixels = []
-    for c in theRasterizationMetaData:
-        x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath = ParamSeperator(c)
-        totalPixels = height*width
-        rasterTotalPixels += totalPixels
-        maxRasterizationPixels.append(totalPixels)
-
-    largestRasterization = max(maxRasterizationPixels)
-
-    if largestRasterization > 5000000:
-        
-        #Create mask array
-        numDimensions = theRasterClass.CreateMask('int32', 'mask') #This is hardcoded for int32
-        return 1
-    else:
-        return 0
 
 
 
@@ -697,4 +576,53 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
             arraydatatypes.append(array.dtype)
         return (arraydatatypes)
 
+
+def ParallelLoad(rasterReadingMetadata):
+    """
+
+    """
+    pool = mp.Pool(2)#len(rasterReadingMetadata)
+    try:
+        pool.imap(Read_Write_Raster, (rasterReadingMetadata[r] for r in rasterReadingMetadata)  ) #
+        pool.close()
+        pool.join()
+    except Exception as e:
+        print(e)
+        print("Error")
+
+
+
+def Read_Write_Raster(rDict):
+    """
+
+    """
+    
+    import os
+    import numpy as np
+    from osgeo import gdal
+    from gdalconst import GA_ReadOnly
+
+    print("Node %s, array size %s " % (rDict["node"], rDict["height"] * rDict["width"]))
+
+    raster = gdal.Open(rDict["filepath"], GA_ReadOnly)
+
+    binaryPartitionPath = r"%s\%s\pdataset.scidb" % (rDict["datastore"], rDict["node"])
+    if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
+    
+    
+    if rDict["height"] * rDict["width"] > 50000000:
+        #Generate an array of elements the length of raster height
+        hdataset = np.arange(rDict["height"])
+        yOffSet = int(rDict["y_min"])
+        
+        for h in np.array_split(hdataset,20):
+            rArray = raster.ReadAsArray(xoff=0, yoff=yOffSet, xsize=rDict["width"], ysize=len(h))
+            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet)
+            yOffSet += len(h)
+    else:
+        
+        rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict["y_min"]), xsize=rDict["width"], ysize=rDict["height"])
+        ArrayToBinary(rArray, binaryPartitionPath, 'data_array', rDict["y_min"])
+              
+    del raster
 
