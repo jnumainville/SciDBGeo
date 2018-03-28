@@ -55,7 +55,32 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
 
     return timed
 
-def datasetsprep():
+def localDatasetPrep():
+    """
+
+    """
+    chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+    raster_tables = ["glc_2000_clipped", "meris_2015_clipped", "nlcd_2006"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
+    
+    
+
+    rasterTables =  [ "%s_%s" % (raster, chunk) for raster in raster_tables for chunk in chunksizes ]
+    datasetRuns = []
+    for r in rasterTables:
+        if "glc_2000_clipped" in r: 
+            pixelValue = 16
+            reclassValues = {"oldPixel" : 16, "newPixel" : 1 }
+        elif "meris_2015_clipped" in r:
+            pixelValue = 100
+            reclassValues = {"oldPixel" : 100, "newPixel" : 1 }
+        elif "nlcd_2006" in r:
+            pixelValue = 21
+            reclassValues = {"oldPixel" : 21, "newPixel" : 1 }
+        datasetRuns.append(  OrderedDict([ ("raster_table", r), ("pixelValue", pixelValue), ("newPixel", 1) ]) )
+
+    return datasetRuns
+
+def zonalDatasetPrep():
     """
     Function will return all the possible combinations of dastes for analysis
     rasterTables = (raster dataset * tile size) 
@@ -97,27 +122,18 @@ def argument_parser():
     """
     import argparse
 
-    parser = argparse.ArgumentParser(description= "Analysis Script for running SciDB Analytics")    
+    parser = argparse.ArgumentParser(description= "Analysis Script for running SciDB Analytics")  
+    parser.add_argument("-csv", required =False, help="Output timing results into CSV file", dest="csv", default="None")  
    
-    analytic = parser.add_mutually_exclusive_group(required = True)
-    analytic.add_argument('-zonal', action='store_true', dest='zonal')
+    subparser = parser.add_subparsersp(required = True, dest="command")
+    analytic_subparser = subparser.add_parser('zonal')
+    analytic_subparser.set_defaults(func=zonalDatasetPrep)
     
-    analytic.add_argument('-count', action='store_true', dest='count')
-    count_subparser = parser.add_subparsers(help='sub-command help', dest='pixelValue')
-    #count_pixelValue = count_subparser.add_parser('-p', type=int,  help='pixel value')
+    count_subparser = subparser.add_parser('count')
+    count_subparser.set_defaults(func=localDatasetPrep)
     
-    analytic.add_argument('-reclassify', action='store_true', dest='reclassify')
-
-    #parser.add_argument("-r", required=True, help="Input file path for the raster", dest="rasterPath")    
-    #parser.add_argument("-a", required=True, help="Name of the destination array", dest="arrayName")
-    #parser.add_argument("-n", required=True, nargs='*', help="Name of the attribute(s) for the destination array", dest="attributes", default="value")
-    #parser.add_argument("-t", required=False, type=int, help="Size in rows of the read window, default: 8", dest="tiles", default=8)
-    #parser.add_argument("-c", required=False, type=int, help="Chunk size for the destination array, default: 1,000", dest="chunk", default=1000)
-    #parser.add_argument("-o", required=False, type=int, help="Chunk overlap size. Adding overlap increases data loading time. default: 0", dest="overlap", default=0)
-    #parser.add_argument("-TempOut", required=False, default='/home/scidb/scidb_data/0/0', dest='OutPath')
-    #parser.add_argument("-SciDBLoadPath", required=False, default='/home/scidb/scidb_data/0/0', dest='SciDBLoadPath')
-    parser.add_argument("-csv", required =False, help="Output timing results into CSV file", dest="csv", default="None")
-    parser.add_argument("-p", required =False, help="Parallel Redimensioning", dest="parallel", default="None")
+    reclass_subparser = subparser.add_parser('reclassify')
+    reclass_subparser.set_defaults(func=localDatasetPrep)
 
     return parser
 
@@ -133,24 +149,23 @@ if __name__ == '__main__':
     filePath = '/mnt/pixel_count_s3_28_2018_all.csv'
     rasterStatsCSV = ''
 
-    datasets = datasetsprep()
+    datasets = args.func()
     timings = OrderedDict()
     
     for d in datasets:
         for r in runs:
-            if args.zonal:                  
+            if args.command == "zonal":                  
                 print(d["raster_path"], d["shape_path"], d["array_table"])
                 timed = ZonalStatistics(d, r)
                 timings[(r,d["array_table"])] = timed
-            elif args.count:
-                timed = CountPixels(sdb, d["array_table"], 13)
+            elif args.command =="count":
+                timed = CountPixels(sdb, d["array_table"], d["pixelValue"])
                 timings[(r,d["array_table"])] = timed
-
-            elif args.reclassify:
+            elif args.command == "reclassify":
                 pass
         
         #Remove the parallel zone files after each dataset run
-        if args.zonal:      
+        if args.command == "zonal":    
             for i in range(SciDBInstances):
                 os.remove("/storage/%s/p_zones.scidb" % (i))
         
