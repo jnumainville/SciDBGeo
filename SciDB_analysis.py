@@ -49,9 +49,9 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     start = timeit.default_timer()
     query = "SELECT count(value) from %s WHERE value = %s" % (arrayTable, pixelValue)
     results = sdbConn.aql_query(query)
-    print("Sum of pixel values %s" % (results.splitlines()[-1]) )
+    print("Sum of pixel values %s for array: %s" % (results.splitlines()[-1], arrayTable) )
     stop = timeit.default_timer()
-    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start) ])
+    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable) ])
 
     return timed
 
@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
     runs = [1,2,3]
     analytic = 1
-    filePath = '/mnt/pixel_count_s3_24_2018_all.csv'
+    filePath = '/mnt/pixel_count_s3_28_2018_all.csv'
     rasterStatsCSV = ''
 
     datasets = datasetsprep()
@@ -141,10 +141,10 @@ if __name__ == '__main__':
             if args.zonal:                  
                 print(d["raster_path"], d["shape_path"], d["array_table"])
                 timed = ZonalStatistics(d, r)
-                timings[r] = timed
+                timings[(r,d["array_table"])] = timed
             elif args.count:
                 timed = CountPixels(sdb, d["array_table"], 13)
-                timings[r] = timed
+                timings[(r,d["array_table"])] = timed
 
             elif args.reclassify:
                 pass

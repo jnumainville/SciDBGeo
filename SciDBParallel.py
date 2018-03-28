@@ -25,11 +25,14 @@ class RasterLoader(object):
     def RasterShapeLogic(self, attributeNames):
         """
         This function will provide the logic for determining the shape of the raster
+        The attributeNames variable is a list of attributes
         """
+        
         if len(attributeNames) >= 1 and self.numbands > 1:
             #Each pixel value will be a new attribute
             attributes = ["%s:%s" % (i, self.datatype) for i in attributeNames ]
             if len(attributeNames) == 1:
+                
                 attString = " ".join(attributes)
                 arrayType = 3
     
@@ -87,7 +90,7 @@ class RasterLoader(object):
             numbands = raster.RasterCount
             width = raster.RasterXSize 
             height  = raster.RasterYSize
-            print(rasterValueDataType)
+            #print(rasterValueDataType)
             
             del raster
         
@@ -95,6 +98,8 @@ class RasterLoader(object):
             rasterValueDataType = thePath.dtype
             height, width = thePath.shape
             numbands = 1
+
+        print(width, height, rasterValueDataType, numbands)
 
         return (width, height, rasterValueDataType, numbands)
 
@@ -127,7 +132,7 @@ class RasterLoader(object):
 
         del sdb 
     
-    def CreateLoadArray(tempRastName, attribute_name, rasterArrayType):
+    def CreateLoadArray(self, tempRastName, attribute_name, rasterArrayType):
         """
         Create the loading array
         """
@@ -631,7 +636,7 @@ def ParallelLoad(rasterReadingMetadata):
     """
 
     """
-    pool = mp.Pool(2)#len(rasterReadingMetadata)
+    pool = mp.Pool(len(rasterReadingMetadata))
     try:
         pool.imap(Read_Write_Raster, (rasterReadingMetadata[r] for r in rasterReadingMetadata)  ) #
         pool.close()
@@ -656,7 +661,8 @@ def Read_Write_Raster(rDict):
 
     raster = gdal.Open(rDict["filepath"], GA_ReadOnly)
 
-    binaryPartitionPath = r"%s\%s\pdataset.scidb" % (rDict["datastore"], rDict["node"])
+    binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
+    print(binaryPartitionPath)
     if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
     
     
