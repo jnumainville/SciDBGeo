@@ -590,7 +590,7 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
     import numpy as np
     # print("Writing out file: %s" % (binaryFilePath))
     col, row = theArray.shape
-    with open(binaryFilePath, 'ab') as fileout:
+    with open(binaryFilePath, 'wb') as fileout:
         #Oneliner that creates the column index. Pull out [y for y in range(col)] to see how it works
         column_index = np.array(np.repeat([y for y in np.arange(0+yOffSet, col+yOffSet) ], row), dtype=np.dtype('int64'))
         
@@ -661,22 +661,30 @@ def Read_Write_Raster(rDict):
 
     raster = gdal.Open(rDict["filepath"], GA_ReadOnly)
 
-    binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
-    #print(binaryPartitionPath)
-    if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
-    
     
     if rDict["height"] * rDict["width"] > 50000000:
         #Generate an array of elements the length of raster height
         hdataset = np.arange(rDict["height"])
         yOffSet = int(rDict["y_min"])
         
+        binaryFiles = []
         for l, h in enumerate(np.array_split(hdataset,20)):
+            print(Writing: %s of 20 % (l))
             rArray = raster.ReadAsArray(xoff=0, yoff=yOffSet, xsize=rDict["width"], ysize=len(h))
             arrayHeight, arrayWidth  = rArray.shape
             
-            print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet+min(h) ))
-            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet + min(h))
+            binaryParitionFile = r"%s/%s/pdataset_%s.scidb" % (l, rDict["datastore"], rDict["node"])
+
+            #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet+min(h) ))
+            ArrayToBinary(rArray, binaryParitionFile, 'data_array', yOffSet + min(h))
+            binaryFiles.append(binaryParitionFile)
+
+        binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
+        #if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
+
+        with open(binaryPartitionPath, "wb") as fo:
+            for bFile in binaryFiles:
+                with open(bFile,'r') as fi: fo.write(fi.read())
             
     else:
         
