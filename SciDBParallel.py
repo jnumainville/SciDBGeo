@@ -588,9 +588,10 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
     output: Numpy 2D array in binary format
     """
     import numpy as np
+    
     # print("Writing out file: %s" % (binaryFilePath))
     col, row = theArray.shape
-    with open(binaryFilePath, 'wb') as fileout:
+    with open(binaryFilePath, 'ab') as fileout:
         #Oneliner that creates the column index. Pull out [y for y in range(col)] to see how it works
         column_index = np.array(np.repeat([y for y in np.arange(0+yOffSet, col+yOffSet) ], row), dtype=np.dtype('int64'))
         
@@ -600,7 +601,7 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
 
         #Oneliner for writing out the file
         #Add this to make it a csv tofile(binaryFilePath), "," and modify the open statement to 'w'
-        np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('x','int64'),('y','int64'),(attributeName,theArray.dtype)]).ravel().tofile(binaryFilePath) 
+        np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('y','int64'),('x','int64'),(attributeName,theArray.dtype)]).ravel().tofile(fileout) 
 
     
     del column_index, row_index, theArray
@@ -657,7 +658,7 @@ def Read_Write_Raster(rDict):
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
 
-    print("Node %s, array size %s " % (rDict["node"], rDict["height"] * rDict["width"]))
+    print("Node %s, array size h:%s, w:%s ,totalpixles: %s " % (rDict["node"],rDict["height"], rDict["width"], rDict["height"] * rDict["width"]))
 
     raster = gdal.Open(rDict["filepath"], GA_ReadOnly)
 
@@ -667,24 +668,19 @@ def Read_Write_Raster(rDict):
         hdataset = np.arange(rDict["height"])
         yOffSet = int(rDict["y_min"])
         
-        binaryFiles = []
-        for l, h in enumerate(np.array_split(hdataset,20)):
-            print(Writing: %s of 20 % (l))
-            rArray = raster.ReadAsArray(xoff=0, yoff=yOffSet, xsize=rDict["width"], ysize=len(h))
-            arrayHeight, arrayWidth  = rArray.shape
-            
-            binaryParitionFile = r"%s/%s/pdataset_%s.scidb" % (l, rDict["datastore"], rDict["node"])
-
-            #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet+min(h) ))
-            ArrayToBinary(rArray, binaryParitionFile, 'data_array', yOffSet + min(h))
-            binaryFiles.append(binaryParitionFile)
-
+        
         binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
-        #if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
-
-        with open(binaryPartitionPath, "wb") as fo:
-            for bFile in binaryFiles:
-                with open(bFile,'r') as fi: fo.write(fi.read())
+        if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
+        
+        for l, h in enumerate(np.array_split(hdataset,20)):
+             
+             print("Node: %s Writing: %s of 20, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
+             rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
+             arrayHeight, arrayWidth  = rArray.shape
+                
+             #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
+             ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
+            
             
     else:
         

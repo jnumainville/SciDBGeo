@@ -248,17 +248,17 @@ class Statements(object):
             print(query)
             return 0
 
-    def InsertRedimension(self, tempRastName, destArray, minY=0, minX=0):
+    def InsertRedimension(self, tempRastName, destArray, oldvalue="value", newvalue="id", minY=0, minX=0):
         """
         First part inserts the boundary array into larger global mask array
         """
         
-        sdbquery ="insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format( A=tempRastName, B=destArray, yOffSet=minY, xOffSet=minX)
+        sdbquery ="insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, {newvalue}, {oldvalue}), {B} ), {B})".format( A=tempRastName, B=destArray, yOffSet=minY, xOffSet=minX, oldvalue=oldvalue, newvalue=newvalue)
         self.sdb.query(sdbquery)
         
-        insertTime = stop-start
+        
 
-        return insertTime
+        return 
 
 class DataTypes(object):
 
