@@ -65,11 +65,14 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue):
     """
     
     start = timeit.default_timer()
-    query = "apply(%s, value2, iif(value = %s, %s, -999)" % (arrayTable, oldValue, newValue)
+    query = "apply(%s, value2, iif(value = %s, %s, -999))" % (arrayTable, oldValue, newValue)
     
     results = sdbConn.query(query)
     stop = timeit.default_timer()
-    
+    Statement = Statements(sdbConn) 
+    Statement.CreateMask(arrayTable, "reclassedTable", "newvalue", "int64") 
+    sdbConn.query("""insert(redimension(apply(%s, newvalue, iif(value = %s, %s, -99)), "reclassedTable"), "reclassedTable") """ %  (arrayTable, oldValue, newValue ) )
+ 
     timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable) ])
 
     return timed
@@ -165,7 +168,7 @@ if __name__ == '__main__':
 
     runs = [1,2,3]
     analytic = 1
-    filePath = '/mnt/pixel_count_4_1_2018.csv'
+    filePath = '/mnt/reclassify_4_2_2018.csv'
     rasterStatsCSV = ''
 
     datasets = args.func()
