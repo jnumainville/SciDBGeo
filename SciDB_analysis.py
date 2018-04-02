@@ -58,6 +58,22 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
 
     return timed
 
+
+def Reclassify(sdbConn, arrayTable, oldValue, newValue):
+    """
+    This function will return the sum of the pixels in a SciDB Array
+    """
+    
+    start = timeit.default_timer()
+    query = "apply(%s, value2, iif(value = %s, %s, -999)" % (arrayTable, oldValue, newValue)
+    
+    results = sdbConn.query(query)
+    stop = timeit.default_timer()
+    
+    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable) ])
+
+    return timed
+
 def localDatasetPrep():
     """
 
@@ -166,7 +182,8 @@ if __name__ == '__main__':
                 timed = CountPixels(sdb, d["array_table"], d["pixelValue"])
                 timings[(r,d["array_table"])] = timed
             elif args.command == "reclassify":
-                pass
+                timed = Reclassify(sdb, d["array_table"], d["pixelValue"], d["newPixel"])
+                timings[(r,d["array_table"])] = timed
         
         #Remove the parallel zone files after each dataset run
         if args.command == "zonal":    
