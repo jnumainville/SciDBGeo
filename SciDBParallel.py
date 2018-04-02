@@ -663,6 +663,12 @@ def Read_Write_Raster(rDict):
     raster = gdal.Open(rDict["filepath"], GA_ReadOnly)
 
     
+    binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
+    if os.path.exists(binaryPartitionPath):
+         print("****Removing file****")
+         os.remove(binaryPartitionPath)
+
+
     if rDict["height"] * rDict["width"] > 50000000:
         #Generate an array of elements the length of raster height
         hdataset = np.arange(rDict["height"])
@@ -670,7 +676,9 @@ def Read_Write_Raster(rDict):
         
         
         binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
-        if os.path.exists(binaryPartitionPath): os.remove(binaryPartitionPath)
+        if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
+             print("****Removing file****")
+             os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
         
         for l, h in enumerate(np.array_split(hdataset,20)):
              

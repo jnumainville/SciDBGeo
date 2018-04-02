@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     runs = [1,2,3]
     analytic = 1
-    filePath = '/mnt/pixel_count_s3_28_2018_all.csv'
+    filePath = '/mnt/pixel_count_4_1_2018.csv'
     rasterStatsCSV = ''
 
     datasets = args.func()
