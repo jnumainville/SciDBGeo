@@ -3,7 +3,7 @@ from SciDBParallel import *
 import os, timeit, csv
 from collections import OrderedDict
 
-def ZonalStatistics(dataset, theRun):
+def ZonalStatistics(dataset, theRun, summaryStatsCSV=none):
     """
     This is the functions for zonal statistics
     Each function should be completely self contained
@@ -29,7 +29,7 @@ def ZonalStatistics(dataset, theRun):
     numDimensions = raster.CreateMask(datapackage[0], 'mask')
     redimension_time = raster.InsertRedimension( 'boundary', 'mask', raster.tlY, raster.tlX )
 
-    summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, rasterStatsCSV)
+    summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, summaryStatsCSV)
     stopSummaryStats = timeit.default_timer()            
     
     timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), \
@@ -59,18 +59,27 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     return timed
 
 
-def Reclassify(sdbConn, arrayTable, oldValue, newValue):
+def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
     """
     This function will return the sum of the pixels in a SciDB Array
     """
     
     start = timeit.default_timer()
-    query = "apply(%s, value2, iif(value = %s, %s, -999)" % (arrayTable, oldValue, newValue)
+    query = "aggregate(apply(%s, value2, iif(value = %s, %s, 0)), sum(value2))" % (arrayTable, oldValue, newValue)
+    #query = "apply(%s, value2, iif(value = %s, %s, -999))" % (arrayTable, oldValue, newValue)
     
     results = sdbConn.query(query)
     stop = timeit.default_timer()
-    
-    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable) ])
+    Statement = Statements(sdbConn)
+    if run == 1:
+        Statement.CreateMask(arrayTable, "reclassedTable", "newvalue", "int64") 
+        sdbConn.query("""insert(redimension(apply(%s, newvalue, iif(value = %s, %s, -99)), "reclassedTable"), "reclassedTable") """ %  (arrayTable, oldValue, newValue ) )
+        stopInsert = timeit.default_timer() 
+        insertTime =  stopInsert - stop
+    else:
+        insertTime = 0
+
+    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable), ("redimensionInsertTime",  insertTime) ])
 
     return timed
 
@@ -110,7 +119,7 @@ def zonalDatasetPrep():
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
     raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006.tif"]
-    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
+    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/regions.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
     rasterPaths =  [ raster_path for raster_path in raster_paths for chunk in chunk_sizes ]
@@ -163,10 +172,10 @@ if __name__ == '__main__':
     query = sdb.queryAFL("list('instances')")
     SciDBInstances = len(query.splitlines())-1
 
-    runs = [1,2,3]
+    runs = [1]#,2,3]
     analytic = 1
-    filePath = '/mnt/pixel_count_4_1_2018.csv'
-    rasterStatsCSV = ''
+    filePath = '/mnt/reclassify_4_6_2018.csv'
+    rasterStatsCSV = '/mnt/zonalstats.csv'
 
     datasets = args.func()
     timings = OrderedDict()
@@ -176,13 +185,13 @@ if __name__ == '__main__':
         for r in runs:
             if args.command == "zonal":                  
                 print(d["raster_path"], d["shape_path"], d["array_table"])
-                timed = ZonalStatistics(d, r)
+                timed = ZonalStatistics(d, r, rasterStatsCSV)
                 timings[(r,d["array_table"])] = timed
             elif args.command =="count":
                 timed = CountPixels(sdb, d["array_table"], d["pixelValue"])
                 timings[(r,d["array_table"])] = timed
             elif args.command == "reclassify":
-                timed = Reclassify(sdb, d["array_table"], d["pixelValue"], d["newPixel"])
+                timed = Reclassify(sdb, d["array_table"], d["pixelValue"], d["newPixel"], 6)
                 timings[(r,d["array_table"])] = timed
         
         #Remove the parallel zone files after each dataset run

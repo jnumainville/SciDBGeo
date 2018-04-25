@@ -260,6 +260,71 @@ class Statements(object):
 
         return 
 
+    def CreateMask(self, SciDBArray, tempArray='mask', attributeName=None, attributeType=None):
+        """
+        Create an empty raster "Mask "that matches the SciDBArray
+        """
+        import re    
+
+        results = self.sdb.queryAFL("show(%s)" % (SciDBArray))
+        results = results.decode("utf-8")
+
+        #R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>\S+)(\])')
+        R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>[^\]]+)')
+        results = results.lstrip('results').strip()
+        match = R.search(results)
+
+        #This code creates 2d planar mask
+        dim = r'([a-zA-Z0-9]+(=[0-9]:[0-9]+:[0-9]+:[0-9]+))'
+        alldimensions = re.findall(dim, results)
+        thedimensions = [d[0] for d in alldimensions]
+        if len(thedimensions) > 2:
+            dimensions = "; ".join(thedimensions[1:])
+        else:
+            dimensions = "; ".join(thedimensions)
+        
+        try:
+          A = match.groupdict()
+          schema = A['attributes']
+          #dimensions = "[%s; %s]" % (A['dim_1'], A['dim_2'])
+        except:
+          print(results)
+          raise 
+
+        if not attributeName and not attributeType:
+            rasterValueDataType = A['attributes']
+        
+        elif attributeName and not attributeType:
+            rasterValueDataType = "%s:%s" % (attributeName, A['attributes'].split(":")[-1])
+
+        elif not attributeName and attributeType:
+            rasterValueDataType = "%s:%s" % (A['attributes'].split(":")[0], attributeType)
+        elif attributeName and attributeType:
+            rasterValueDataType = "%s:%s" % (attributeName, attributeType)
+
+        print(rasterValueDataType)
+
+        try:
+          sdbquery = r"create array %s <%s> [%s]" % (tempArray, rasterValueDataType, dimensions)
+          self.sdb.query(sdbquery)
+        except:
+          self.sdb.query("remove(%s)" % tempArray)
+          sdbquery = r"create array %s <%s> [%s]" % (tempArray, rasterValueDataType, dimensions)
+          self.sdb.query(sdbquery)
+
+        return thedimensions
+
+
+
+
+
+
+
+
+
+
+
+
 class DataTypes(object):
 
     def __init__(self):
