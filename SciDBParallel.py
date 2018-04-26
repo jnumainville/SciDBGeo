@@ -528,6 +528,11 @@ def BigRasterization(inParams):
     vector_dataset = ogr.Open(vectorPath)
     theLayer = vector_dataset.GetLayer()
 
+    binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
+    if os.path.exists(binaryPartitionPath):
+         print("****Removing file****")
+         os.remove(binaryPartitionPath)
+
     #Generate an array of elements the length of raster height
     hdataset = np.arange(height)
     if height * width > 50000000:
@@ -660,7 +665,7 @@ def Read_Write_Raster(rDict):
 
     print("Node %s, array size h:%s, w:%s ,totalpixles: %s " % (rDict["node"],rDict["height"], rDict["width"], rDict["height"] * rDict["width"]))
 
-    raster = gdal.Open(rDict["filepath"], GA_ReadOnly)
+    raster = gdal.OpenShared(rDict["filepath"], GA_ReadOnly)
 
     
     binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
@@ -680,9 +685,9 @@ def Read_Write_Raster(rDict):
              print("****Removing file****")
              os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
         
-        for l, h in enumerate(np.array_split(hdataset,20)):
+        for l, h in enumerate(np.array_split(hdataset,50)):
              
-             print("Node: %s Writing: %s of 20, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
+             print("Node: %s Writing: %s of 50, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
              rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
              arrayHeight, arrayWidth  = rArray.shape
                 

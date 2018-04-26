@@ -3,7 +3,7 @@ from SciDBParallel import *
 import os, timeit, csv
 from collections import OrderedDict
 
-def ZonalStatistics(dataset, theRun, summaryStatsCSV=none):
+def ZonalStatistics(dataset, theRun, summaryStatsCSV=None):
     """
     This is the functions for zonal statistics
     Each function should be completely self contained
@@ -116,10 +116,10 @@ def zonalDatasetPrep():
     """
     
 
-    chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+    chunk_sizes = [500] #, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
     raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006.tif"]
-    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/regions.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
+    shapefiles = ["/home/04489/dhaynes/shapefiles/states.shp"]#["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/regions.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
     rasterPaths =  [ raster_path for raster_path in raster_paths for chunk in chunk_sizes ]
@@ -174,7 +174,7 @@ if __name__ == '__main__':
 
     runs = [1]#,2,3]
     analytic = 1
-    filePath = '/mnt/reclassify_4_6_2018.csv'
+    filePath = '/mnt/zonal_4_17_2018.csv'
     rasterStatsCSV = '/mnt/zonalstats.csv'
 
     datasets = args.func()
@@ -185,6 +185,7 @@ if __name__ == '__main__':
         for r in runs:
             if args.command == "zonal":                  
                 print(d["raster_path"], d["shape_path"], d["array_table"])
+                rasterStatsCSV = '/mnt/zonalstats_%s_%s.csv' % (d["shape_path"].split("/")[-1].split(".")[0], d["array_table"])
                 timed = ZonalStatistics(d, r, rasterStatsCSV)
                 timings[(r,d["array_table"])] = timed
             elif args.command =="count":
