@@ -13,7 +13,15 @@ def ReadReclassTxt(reclassFile):
     return reclassText
 
 
-races = ['sage.asian_2010', 'sage.black_2010', 'sage.hispanic_2010', 'sage.pi_2010', 'sage.sor_2010', 'sage.ai_2010','sage.white_2010']
+races = {
+        'asian': {'arrayName': 'asian_2010', 'reclassFileName': 'sage.asian_2010'},
+        'black': {'arrayName': 'black_2010', 'reclassFileName': 'sage.black_2010'},
+        'hispanic': {'arrayName': 'hispanic_2010', 'reclassFileName': 'sage.hispanic_2010'},
+        'pi': {'arrayName': 'pi_2010', 'reclassFileName': 'sage.pi_2010'},
+        'sor': {'arrayName': 'sor_2010', 'reclassFileName': 'sage.sor_2010'},
+        'ai': {'arrayName': 'ai_2010', 'reclassFileName': 'sage.ai_2010'},
+        'white': {'arrayName': 'white_2010', 'reclassFileName': 'sage.white_2010'}
+        }
         
 sdb = iquery()
 
@@ -22,54 +30,56 @@ rasterPath = '/media/sf_scidb/population/population_2010myc.vrt'
 mypath = '/media/sf_scidb/population/census_tracts'
 myshps = ['%s/%s' % (root, f) for root, dirs, files in os.walk(mypath) for f in files if 'shp' in f]
 
-outtext = '%s/mn_census_tracts.txt' % (mypath)
 
-with open(outtext, 'w'):
-    for myshp in myshps:
-        raster = ZonalStats(rasterPath, myshp, arrayName)
 
-        raster.RasterMetadata(rasterPath, myshp, raster.SciDBInstances, '/home/scidb/scidb_data/0' ) 
-        a = raster.RasterizePolygon(rasterPath, myshp)
-        print(a.shape)
-        datapackage = ParallelRasterization(raster.arrayMetaData)
-        sdb_statements = Statements(sdb)
 
-        theAttribute = 'id:%s' % ('int32') #datapackage[0]
+for myshp in myshps:
+    raster = ZonalStats(rasterPath, myshp, arrayName)
 
-        sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
-        sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
-        #Load operator -1 in parallel
-        numDimensions = raster.CreateMask('int32', 'mask') #datapackage[0]
-        #raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
+    raster.RasterMetadata(rasterPath, myshp, raster.SciDBInstances, '/home/scidb/scidb_data/0' ) 
+    #a = raster.RasterizePolygon(rasterPath, myshp)
+    #print(a.shape)
+    datapackage = ParallelRasterization(raster.arrayMetaData)
+    sdb_statements = Statements(sdb)
 
-        tractID = myshp.split('/')[-1].split(".")[0]
-        #print(tractID)
-        reclassFiles = ['%s/%s' % (root, f) for root, dirs, files in os.walk(mypath) for f in files if tractID in f and 'txt' in f]
-        #print(reclassFiles)
-        filePath = "/".join(myshp.split('/')[:-1])
-        #print(filePath)
+    theAttribute = 'id:%s' % ('int32') #datapackage[0]
 
-        for race in races:
-            reclassFilePath = r'%s/%s_%s.txt' % (filePath, race, tractID)
-            reclassText = ReadReclassTxt(reclassFilePath)
-            csvOut = '%s.csv' % (myshp.split('.')[0])
-            tiffOut = '%s.tiff' % (myshp.split('.')[0])
+    sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
+    sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
+    #Load operator -1 in parallel
+    numDimensions = raster.CreateMask('int32', 'mask') #datapackage[0]
+    #raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
 
-            print("**************Reclassifiying raster*************")
-            raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, 1, csvOut)        
-            dataArray = sdb.OutputToArray(csvOut, valueColumn=2, yColumn= 3)
-            raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
-            outtext.write("%s\n" %(tiffOut))
+    tractID = myshp.split('/')[-1].split(".")[0]
+    #print(tractID)
+    reclassFiles = ['%s/%s' % (root, f) for root, dirs, files in os.walk(mypath) for f in files if tractID in f and 'txt' in f]
+    #print(reclassFiles)
+    filePath = "/".join(myshp.split('/')[:-1])
+    #print(filePath)
 
-            maskCsvOut = '%s_mask.csv' % (myshp.split('.')[0])
-            maskTiffOut = '%s_mask.tiff' % (myshp.split('.')[0])
-            print("************** outputing mask*************")
-            #maskQuery = "between(mask, 8551, 8935, 10515, 10572)"
-            #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
-            maskQuery = "scan(boundary)"
-            raster.sdb.queryCSV(maskQuery, maskCsvOut)
-            dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
-            raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
+    for race in races.keys():
+        reclassFilePath = r'%s/%s_%s.txt' % (filePath, races[race]['reclassFileName'], tractID)
+        #print(reclassFilePath)
+        reclassText = ReadReclassTxt(reclassFilePath)
+        csvOut = '%s.csv' % (reclassFilePath[:-4])
+        tiffOut = '%s.tif' % (reclassFilePath[:-4])
+
+        print("**************Reclassifiying raster*************")
+        raster.JoinReclass(races[race]['arrayName'],'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, 1, csvOut)        
+        dataArray = sdb.OutputToArray(csvOut, valueColumn=2, yColumn= 3)
+        raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
+        
+
+        maskCsvOut = '%s_mask.csv' % (myshp.split('.')[0])
+        maskTiffOut = '%s_mask.tif' % (myshp.split('.')[0])
+        print("************** outputing mask*************")
+        #maskQuery = "between(mask, 8551, 8935, 10515, 10572)"
+        #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
+        maskQuery = "scan(boundary)"
+        raster.sdb.queryCSV(maskQuery, maskCsvOut)
+        dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
+        raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
+
 
 
 
