@@ -7,6 +7,7 @@ This script will densify a given raster dataset
 
 from osgeo import gdal
 import numpy as np
+import os
 
 
 def densification(theArray, multiplier):
@@ -54,7 +55,8 @@ def main(inRasterFilePath, densifier, iterator, outRasterFilePath ):
     
     #Create new raster file
     tiffDriver = gdal.GetDriverByName('GTiff')
-    theRast = tiffDriver.Create(outRasterFilePath, numCols*densifier , numRows*densifier, 1, rasterType, options = [ 'COMPRESS=DEFLATE' ])
+    #driver.Create(fpath, cols, rows, 1, gdal.GDT_UInt32, ['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=IF_NEEDED', 'TFW=YES']
+    theRast = tiffDriver.Create(outRasterFilePath, numCols*densifier , numRows*densifier, 1, rasterType, options = [ 'TILED=YES','BIGTIFF=YES' ])
     if theRast:
         theRast.SetProjection(rasterProjection)
         theRast.SetGeoTransform(alteredTransform)
@@ -75,6 +77,7 @@ def main(inRasterFilePath, densifier, iterator, outRasterFilePath ):
             #print(row, rowCounter, array.shape)
             densifiedArray = densification(array, densifier)
             theBand.WriteArray(densifiedArray, yoff=row*densifier)
+            theBand.FlushCache()
             del densifiedArray
             
             #write_raster(outRasterFilePath, densifiedArray, row)
@@ -123,7 +126,21 @@ def argument_parser():
 #main(inR, 2, 100, outR)
 
 if __name__ == '__main__':
-     args = argument_parser().parse_args()
-     main(args.input, args.dense, args.iter, args.output)
-     print("Done")
+    args = argument_parser().parse_args()
+    if os.path.isfile(args.input):
+        main(args.input, args.dense, args.iter, args.output)
+    elif os.path.isdir(args.input):
+        files = os.listdir(args.input)
+        for f in files:
+            theInTiffPath = "%s\%s" % (args.input, f)
+            theOutTiffPath = "%s\%s" % (args.output, f)
+            print(theInTiffPath, theOutTiffPath)
+            main(theInTiffPath, args.dense, args.iter, theOutTiffPath)
+        
+        tileFiles = "%s\%s" % (args.output, "tiles.txt")
+        with open(tileFiles, 'w') as fout:
+            for r in files:
+                fout.writelines("%s\%s\n" % (args.output, f))
+
+    print("Done")
     
