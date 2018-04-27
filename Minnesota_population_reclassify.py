@@ -2,6 +2,24 @@ from scidb import iquery, Statements
 from SciDBParallel import ZonalStats, ArrayToBinary, ParallelRasterization, ParamSeperator
 import os
 
+def CleanUp(*args):
+    """
+    Clean up temporary files
+    """
+
+    for f in args:
+        os.remove(f)
+def StartUp(thePath, theRacesDict):
+    """
+    
+    """
+    for race in theRacesDict.keys():
+        theRacePath = "%s/%s" % (thePath, race)
+        try:
+            os.mkdir(theRacePath)
+        except:
+            os.removedirs(theRacePath)
+            os.mkdir(theRacePath)
 
 def ReadReclassTxt(reclassFile):
     """
@@ -31,7 +49,7 @@ mypath = '/media/sf_scidb/population/census_tracts'
 myshps = ['%s/%s' % (root, f) for root, dirs, files in os.walk(mypath) for f in files if 'shp' in f]
 
 
-
+StartUp(mypath, races)
 
 for myshp in myshps:
     raster = ZonalStats(rasterPath, myshp, arrayName)
@@ -62,7 +80,8 @@ for myshp in myshps:
         #print(reclassFilePath)
         reclassText = ReadReclassTxt(reclassFilePath)
         csvOut = '%s.csv' % (reclassFilePath[:-4])
-        tiffOut = '%s.tif' % (reclassFilePath[:-4])
+        tiffOut = r'%s/%s/%s.tif' % (filePath, race, tractID)
+        
 
         print("**************Reclassifiying raster*************")
         raster.JoinReclass(races[race]['arrayName'],'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, 1, csvOut)        
@@ -79,6 +98,15 @@ for myshp in myshps:
         raster.sdb.queryCSV(maskQuery, maskCsvOut)
         dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
         raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
+
+
+
+for race in races.keys():
+    theRaceDirectory = "%s/%s" % (filePath, race)
+    listTiffFiles = ['%s/%s' % (root, f) for root, dirs, files in os.walk(theRaceDirectory) for f in files if race in f and '.tif' in f]
+    outFiles = "%s/%s_inputfiles.txt" % (mypath, race)
+    with open(outFiles) as fout:
+        fout.writelines(listTiffFiles)
 
 
 
