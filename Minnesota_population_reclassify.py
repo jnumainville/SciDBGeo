@@ -1,17 +1,20 @@
 from scidb import iquery, Statements
-from SciDBParallel import ZonalStats, ArrayToBinary, ParallelRasterization, Rasterization, ParamSeperator
+from SciDBParallel import ZonalStats, ArrayToBinary, ParallelRasterization, ParamSeperator
 import os
 
 
-def ReadReclassTxt(inShapefile):
+def ReadReclassTxt(reclassFile):
     """
 
     """
-    reclassFile = '%s.txt' % (inShapefile.split('.')[0])
+    #reclassFile = '%s.txt' % (inShapefile.split('.')[0])
     reclassText = open(reclassFile).read().replace('\n','')
 
     return reclassText
 
+
+races = ['sage.asian_2010', 'sage.black_2010', 'sage.hispanic_2010', 'sage.pi_2010', 'sage.sor_2010', 'sage.ai_2010','sage.white_2010']
+        
 sdb = iquery()
 
 arrayName = 'population_2010'
@@ -39,25 +42,34 @@ with open(outtext, 'w'):
         numDimensions = raster.CreateMask('int32', 'mask') #datapackage[0]
         #raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
 
-        reclassText = ReadReclassTxt(myshp)
-        csvOut = '%s.csv' % (myshp.split('.')[0])
-        tiffOut = '%s.tiff' % (myshp.split('.')[0])
+        tractID = myshp.split('/')[-1].split(".")[0]
+        #print(tractID)
+        reclassFiles = ['%s/%s' % (root, f) for root, dirs, files in os.walk(mypath) for f in files if tractID in f and 'txt' in f]
+        #print(reclassFiles)
+        filePath = "/".join(myshp.split('/')[:-1])
+        #print(filePath)
 
-        print("**************Reclassifiying raster*************")
-        raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, 1, csvOut)        
-        dataArray = sdb.OutputToArray(csvOut, valueColumn=2, yColumn= 3)
-        raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
-        outtext.write("%s\n" %(tiffOut))
+        for race in races:
+            reclassFilePath = r'%s/%s_%s.txt' % (filePath, race, tractID)
+            reclassText = ReadReclassTxt(reclassFilePath)
+            csvOut = '%s.csv' % (myshp.split('.')[0])
+            tiffOut = '%s.tiff' % (myshp.split('.')[0])
 
-        maskCsvOut = '%s_mask.csv' % (myshp.split('.')[0])
-        maskTiffOut = '%s_mask.tiff' % (myshp.split('.')[0])
-        print("************** outputing mask*************")
-        #maskQuery = "between(mask, 8551, 8935, 10515, 10572)"
-        #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
-        maskQuery = "scan(boundary)"
-        raster.sdb.queryCSV(maskQuery, maskCsvOut)
-        dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
-        raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
+            print("**************Reclassifiying raster*************")
+            raster.JoinReclass(raster.SciDBArrayName,'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, reclassText, 1, csvOut)        
+            dataArray = sdb.OutputToArray(csvOut, valueColumn=2, yColumn= 3)
+            raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
+            outtext.write("%s\n" %(tiffOut))
+
+            maskCsvOut = '%s_mask.csv' % (myshp.split('.')[0])
+            maskTiffOut = '%s_mask.tiff' % (myshp.split('.')[0])
+            print("************** outputing mask*************")
+            #maskQuery = "between(mask, 8551, 8935, 10515, 10572)"
+            #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
+            maskQuery = "scan(boundary)"
+            raster.sdb.queryCSV(maskQuery, maskCsvOut)
+            dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
+            raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
 
 
 
