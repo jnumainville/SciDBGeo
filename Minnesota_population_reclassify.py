@@ -2,7 +2,7 @@ from scidb import iquery, Statements
 from SciDBParallel import ZonalStats, ArrayToBinary, ParallelRasterization, ParamSeperator
 import os
 
-def CleanUp(*args):
+def CleanUp(args):
     """
     Clean up temporary files
     """
@@ -18,6 +18,8 @@ def StartUp(thePath, theRacesDict):
         try:
             os.mkdir(theRacePath)
         except:
+            allFiles = ['%s/%s' % (root, f) for root, dirs, files in os.walk(theRacePath) for f in files]
+            CleanUp(allFiles)
             os.removedirs(theRacePath)
             os.mkdir(theRacePath)
 
@@ -88,24 +90,26 @@ for myshp in myshps:
         dataArray = sdb.OutputToArray(csvOut, valueColumn=2, yColumn= 3)
         raster.WriteRaster(dataArray, tiffOut, noDataValue=-999)
         
-
+        #Code for outputting the mask
         maskCsvOut = '%s_mask.csv' % (myshp.split('.')[0])
         maskTiffOut = '%s_mask.tif' % (myshp.split('.')[0])
         print("************** outputing mask*************")
         #maskQuery = "between(mask, 8551, 8935, 10515, 10572)"
         #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
-        maskQuery = "scan(boundary)"
+        maskQuery = "sort(boundary, y1, x1)"
         raster.sdb.queryCSV(maskQuery, maskCsvOut)
         dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
         raster.WriteRaster(dataArray, maskTiffOut, noDataValue=-999)
 
+    break
+
 
 
 for race in races.keys():
-    theRaceDirectory = "%s/%s" % (filePath, race)
+    theRaceDirectory = "%s/%s" % (mypath, race)
     listTiffFiles = ['%s/%s' % (root, f) for root, dirs, files in os.walk(theRaceDirectory) for f in files if race in f and '.tif' in f]
-    outFiles = "%s/%s_inputfiles.txt" % (mypath, race)
-    with open(outFiles) as fout:
+    outFiles = "%s/%s/%s_inputfiles.txt" % (mypath, race, race)
+    with open(outFiles, 'w') as fout:
         fout.writelines(listTiffFiles)
 
 
