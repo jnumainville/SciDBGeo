@@ -537,7 +537,7 @@ def BigRasterization(inParams):
     hdataset = np.arange(height)
     if height * width > 50000000:
         #This is the very big rasterization process
-        for p, h in enumerate(np.array_split(hdataset,35)):
+        for p, h in enumerate(np.array_split(hdataset,100)):
             #h min is the minimum offset value
             colX, colY = world2Pixel(outTransform, x, y)
             memX, memY = Pixel2world(outTransform, colX, colY + h.min())
@@ -685,9 +685,9 @@ def Read_Write_Raster(rDict):
              print("****Removing file****")
              os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
         
-        for l, h in enumerate(np.array_split(hdataset,50)):
+        for l, h in enumerate(np.array_split(hdataset,300)):
              
-             print("Node: %s Writing: %s of 50, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
+             print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
              rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
              arrayHeight, arrayWidth  = rArray.shape
                 

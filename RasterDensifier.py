@@ -56,7 +56,7 @@ def main(inRasterFilePath, densifier, iterator, outRasterFilePath ):
     #Create new raster file
     tiffDriver = gdal.GetDriverByName('GTiff')
     #driver.Create(fpath, cols, rows, 1, gdal.GDT_UInt32, ['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=IF_NEEDED', 'TFW=YES']
-    theRast = tiffDriver.Create(outRasterFilePath, numCols*densifier , numRows*densifier, 1, rasterType, options = [ 'TILED=YES','BIGTIFF=YES' ])
+    theRast = tiffDriver.Create(outRasterFilePath, numCols*densifier , numRows*densifier, 1, rasterType, options = [ 'TILED=YES' ])
     if theRast:
         theRast.SetProjection(rasterProjection)
         theRast.SetGeoTransform(alteredTransform)
@@ -132,15 +132,15 @@ if __name__ == '__main__':
     elif os.path.isdir(args.input):
         files = os.listdir(args.input)
         for f in files:
-            theInTiffPath = "%s\%s" % (args.input, f)
-            theOutTiffPath = "%s\%s" % (args.output, f)
-            print(theInTiffPath, theOutTiffPath)
+            theInTiffPath = "%s/%s" % (args.input, f)
+            theOutTiffPath = "%s/%s" % (args.output, f)
+            #print(theInTiffPath, theOutTiffPath)
             main(theInTiffPath, args.dense, args.iter, theOutTiffPath)
         
         tileFiles = "%s\%s" % (args.output, "tiles.txt")
         with open(tileFiles, 'w') as fout:
             for r in files:
-                fout.writelines("%s\%s\n" % (args.output, f))
+                fout.writelines("%s/%s\n" % (args.output, f))
 
     print("Done")
     
