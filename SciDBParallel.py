@@ -19,7 +19,7 @@ class RasterLoader(object):
         self.chunksize = chunksize
         hdataset = np.arange(self.height)
 
-        self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange), "height": len(heightRange), "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
+        self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange), "height": len(heightRange), "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath, "attribute": self.AttributeString, "array_shape": self.RasterArrayShape} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
         #self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, attribute=self.AttributeString, band=self.numbands )
         
     def RasterShapeLogic(self, attributeNames):
