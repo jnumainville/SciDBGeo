@@ -705,14 +705,18 @@ def Read_Write_Raster(rDict):
         from scidb import Statements
         print("Massive Array")
 
-        if not rDict["destination_array"]:
+        if rDict["destination_array"]:
             print(rDict)
                 
             sdb = iquery()
             sdb_statements = Statements(sdb)
-            loadAttribute = "%s_1:%s" % (rDict["attribut"].split(":")[0], rDict["attribut"].split(":")[1])
+            
+            loadAttribute = "%s_1:%s" % (rDict["attribute"].split(":")[0], rDict["attribute"].split(":")[1])
+            hdataset = np.arange(rDict["height"])
+            yOffSet = int(rDict["y_min"])
 
             for l, h in enumerate(np.array_split(hdataset,300)):
+                print("here")
 
                 binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
                 if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
