@@ -7,7 +7,7 @@ from gdalconst import GA_ReadOnly
 
 class RasterLoader(object):
 
-    def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, yOffSet=None):
+    def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, yOffSet=None, destinationArray=None):
         """
         Initialize the class RasterReader
         """
@@ -19,7 +19,9 @@ class RasterLoader(object):
         self.chunksize = chunksize
         hdataset = np.arange(self.height)
 
-        self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange), "height": len(heightRange), "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath, "attribute": self.AttributeString, "array_shape": self.RasterArrayShape} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
+        self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange),"height": len(heightRange), \
+        "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath, "attribute": self.AttributeString, \
+        "array_shape": self.RasterArrayShape, "destination_array": destinationArray} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
         #self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, attribute=self.AttributeString, band=self.numbands )
         
     def RasterShapeLogic(self, attributeNames):
@@ -702,29 +704,32 @@ def Read_Write_Raster(rDict):
         from scidb import iquery
         from scidb import Statements
         print("Massive Array")
-        print(rDict)
-            
-        sdb = iquery()
-        sdb_statements = Statements(sdb)
 
-        for l, h in enumerate(np.array_split(hdataset,300)):
-
-            binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
-            if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
-                print("****Removing file****")
-                os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
-             
-            print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
-            rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
-            arrayHeight, arrayWidth  = rArray.shape
+        if not rDict["destination_array"]:
+            print(rDict)
                 
-            #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
-            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
-            sdb_statements.CreateLoadArray("LoadArray", attribute, 1) #Hard coded RasterAttribute as 1
-            sdb_statements.LoadOneDimensionalArray(-1, "LoadArray", attribute, 1, 'pdataset.scidb') #Hard coded RasterAttribute as 1
-            sdb_statements.InsertRedimension( "LoadArray", arrayName, oldvalue=loadAttribute.split(":")[0], newvalue='value')
+            sdb = iquery()
+            sdb_statements = Statements(sdb)
+            loadAttribute = "%s_1:%s" % (rDict["attribut"].split(":")[0], rDict["attribut"].split(":")[1])
 
-    
+            for l, h in enumerate(np.array_split(hdataset,300)):
+
+                binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
+                if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
+                    print("****Removing file****")
+                    os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
+                 
+                print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
+                rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
+                arrayHeight, arrayWidth  = rArray.shape
+                    
+                #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
+                ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
+
+                sdb_statements.CreateLoadArray("LoadArray", attribute, rDict["array_shape"]) 
+                sdb_statements.LoadOneDimensionalArray(-1, "LoadArray", loadAttribute, rDict["array_shape"], 'pdataset.scidb')
+                sdb_statements.InsertRedimension( "LoadArray", rDict["destination_array"], oldvalue=loadAttribute.split(":")[0], newvalue='value')
+
               
     del raster
 
