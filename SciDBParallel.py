@@ -673,8 +673,12 @@ def Read_Write_Raster(rDict):
          print("****Removing file****")
          os.remove(binaryPartitionPath)
 
-
-    if rDict["height"] * rDict["width"] > 50000000:
+    if rDict["height"] * rDict["width"] < 5000000:
+        
+        rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict["y_min"]), xsize=rDict["width"], ysize=rDict["height"])
+        ArrayToBinary(rArray, binaryPartitionPath, 'data_array', rDict["y_min"])
+    
+    elif 5000000 <= rDict["height"] * rDict["width"] < 50000000 :
         #Generate an array of elements the length of raster height
         hdataset = np.arange(rDict["height"])
         yOffSet = int(rDict["y_min"])
@@ -682,23 +686,45 @@ def Read_Write_Raster(rDict):
         
         binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
         if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
-             print("****Removing file****")
-             os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
+            print("****Removing file****")
+            os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
         
         for l, h in enumerate(np.array_split(hdataset,300)):
              
-             print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
-             rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
-             arrayHeight, arrayWidth  = rArray.shape
+            print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
+            rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
+            arrayHeight, arrayWidth  = rArray.shape
                 
-             #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
-             ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
+            #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
+            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
+
+    elif rDict["height"] * rDict["width"] > 50000000 :
+        from scidb import iquery
+        from scidb import Statements
+        print("Massive Array")
+        print(rDict)
             
-            
-    else:
-        
-        rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict["y_min"]), xsize=rDict["width"], ysize=rDict["height"])
-        ArrayToBinary(rArray, binaryPartitionPath, 'data_array', rDict["y_min"])
+        sdb = iquery()
+        sdb_statements = Statements(sdb)
+
+        for l, h in enumerate(np.array_split(hdataset,300)):
+
+            binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
+            if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
+                print("****Removing file****")
+                os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
+             
+            print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
+            rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
+            arrayHeight, arrayWidth  = rArray.shape
+                
+            #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
+            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
+            sdb_statements.CreateLoadArray("LoadArray", attribute, 1) #Hard coded RasterAttribute as 1
+            sdb_statements.LoadOneDimensionalArray(-1, "LoadArray", attribute, 1, 'pdataset.scidb') #Hard coded RasterAttribute as 1
+            sdb_statements.InsertRedimension( "LoadArray", arrayName, oldvalue=loadAttribute.split(":")[0], newvalue='value')
+
+    
               
     del raster
 
