@@ -55,9 +55,8 @@ class RasterLoader(object):
         """
         from scidb import iquery
         sdb = iquery()
-        #query = sdb.queryAFL("list('instances')")
-        #self.SciDBInstances = len(query.splitlines())-1
-        self.SciDB_Instances = 12
+        query = sdb.queryAFL("list('instances')")
+        self.SciDB_Instances = len(query.splitlines())-1
             
             
     def GetMetadata(self, scidbInstances, rasterFilePath, outPath, loadPath,  band):
@@ -645,14 +644,50 @@ def ParallelLoad(rasterReadingMetadata):
 
     """
     pool = mp.Pool(len(rasterReadingMetadata))
+
+    #ArraySplicerLogic()    
     try:
-        pool.imap(Read_Write_Raster, (rasterReadingMetadata[r] for r in rasterReadingMetadata)  ) #
+        loadLoops = ArraySplicerLogic(rasterReadingMetadata[0]['width'], rasterReadingMetadata[0]['height'], 3000000)
+        print("Number of loops for loading: %s" % (loadLoops))
+        nodeLoopData = AdjustMetaData(loadLoops, rasterReadingMetadata)
+        #{r:{"loop": l, "height": h} for r in rasterReadingMetadata.keys() for l, h in enumerate(np.array_split(rasterReadingMetadata[r]["height"],loops))}
+            #arrayHeight, arrayWidth  = rArray.shape
+        #print(nodeLoopData)
+        # for n in nodeLoopData:
+        #     print(nodeLoopData[n])
+        
+        quit()
+        pool.imap(Read_Write_Raster, (nodeLoopData[n] for n in nodeLoopData)  ) #
         pool.close()
         pool.join()
     except Exception as e:
         print(e)
         print("Error")
 
+def AdjustMetaData(loops, theRMD):
+    """
+    Function to adjust the metadata for proper loading
+    This function returns the adjust load dimensions for each iteration
+    """
+    adjustedData = {(l,r): {"node": theRMD[r]["node"], "y_min": theRMD[r]["y_min"], "y_max": theRMD[r]["y_max"], 
+    "height": theRMD[r]["height"] , "width": theRMD[r]["width"], "datastore": theRMD[r]["datastore"], 
+    "filepath": theRMD[r]["filepath"], "array_shape": theRMD[r]["array_shape"], "destination_array": theRMD[r]["destination_array"], 
+    "attribute": theRMD[r]["attribute"], "xoff": 0, "yoff": int(theRMD[r]["y_min"] + min(h)), "ysize":len(h), "xsize": theRMD[r]["width"] } 
+    for r in theRMD for l, h in enumerate(np.array_split(np.arange(theRMD[r]["height"]),loops))}
+    #rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
+
+    #OrderedDict()
+    sortedDict = OrderedDict( [ (r,adjustedData[r]) for r in sorted(adjustedData.keys())] )
+    #print(sortedDict)
+        
+        # for l, h in enumerate(np.array_split(np.arange(theRMD[r]["height"]),loops)):
+        #     print(r,len(h))
+            # print(theRMD[r])
+            
+
+    return sortedDict
+
+    
 
 
 def Read_Write_Raster(rDict):
@@ -744,3 +779,21 @@ def Read_Write_Raster(rDict):
               
     del raster
 
+def ArraySplicerLogic(width, height, maxPixels=20000000):
+    """
+    This function will determine how many loops are necessary to efficiently load a large geoTiff
+    maxPixels should be determined based on memory constraints of your machine
+    """
+    
+    if height * width < maxPixels:
+        return 1
+    elif width > maxPixels:
+        return height
+    else:
+        possibles = OrderedDict([(h, h * width) for h in range(height)])
+        solutions = {k: v for k, v in possibles.items() if v <= maxPixels and k > 0}
+        #print(solutions)
+        numIterations = height / max({k: v for k, v in solutions.items()})
+        return round(numIterations)
+
+            #OrderedDict([  ] )
