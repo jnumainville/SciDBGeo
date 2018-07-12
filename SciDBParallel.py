@@ -647,17 +647,18 @@ def ParallelLoad(rasterReadingMetadata):
 
     #ArraySplicerLogic()    
     try:
-        loadLoops = ArraySplicerLogic(rasterReadingMetadata[0]['width'], rasterReadingMetadata[0]['height'], 3000000)
+        loadLoops = ArraySplicerLogic(rasterReadingMetadata[0]['width'], rasterReadingMetadata[0]['height'], 2000000)
         print("Number of loops for loading: %s" % (loadLoops))
         nodeLoopData = AdjustMetaData(loadLoops, rasterReadingMetadata)
-        #{r:{"loop": l, "height": h} for r in rasterReadingMetadata.keys() for l, h in enumerate(np.array_split(rasterReadingMetadata[r]["height"],loops))}
-            #arrayHeight, arrayWidth  = rArray.shape
-        #print(nodeLoopData)
+        # print(nodeLoopData)
+
+        for l, nodeLoopIteration in enumerate(np.array_split(list(nodeLoopData.items()), loadLoops)):
         # for n in nodeLoopData:
         #     print(nodeLoopData[n])
         
-        quit()
-        pool.imap(Read_Write_Raster, (nodeLoopData[n] for n in nodeLoopData)  ) #
+            print("Loop %s" % (l))
+            pool.imap(Read_Write_Raster, (nodeLoopIteration[n] for n in nodeLoopIteration)  ) #
+        
         pool.close()
         pool.join()
     except Exception as e:
@@ -674,17 +675,9 @@ def AdjustMetaData(loops, theRMD):
     "filepath": theRMD[r]["filepath"], "array_shape": theRMD[r]["array_shape"], "destination_array": theRMD[r]["destination_array"], 
     "attribute": theRMD[r]["attribute"], "xoff": 0, "yoff": int(theRMD[r]["y_min"] + min(h)), "ysize":len(h), "xsize": theRMD[r]["width"] } 
     for r in theRMD for l, h in enumerate(np.array_split(np.arange(theRMD[r]["height"]),loops))}
-    #rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
 
-    #OrderedDict()
     sortedDict = OrderedDict( [ (r,adjustedData[r]) for r in sorted(adjustedData.keys())] )
-    #print(sortedDict)
-        
-        # for l, h in enumerate(np.array_split(np.arange(theRMD[r]["height"]),loops)):
-        #     print(r,len(h))
-            # print(theRMD[r])
-            
-
+    
     return sortedDict
 
     
@@ -710,30 +703,30 @@ def Read_Write_Raster(rDict):
          print("****Removing file****")
          os.remove(binaryPartitionPath)
 
-    if rDict["height"] * rDict["width"] < 5000000:
+    # if rDict["height"] * rDict["width"] < 5000000:
         
-        rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict["y_min"]), xsize=rDict["width"], ysize=rDict["height"])
-        ArrayToBinary(rArray, binaryPartitionPath, 'data_array', rDict["y_min"])
+    rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict["y_min"]), xsize=rDict["width"], ysize=rDict["height"])
+    ArrayToBinary(rArray, binaryPartitionPath, 'data_array', rDict["y_min"])
     
-    else:
-        #Generate an array of elements the length of raster height
-        hdataset = np.arange(rDict["height"])
-        yOffSet = int(rDict["y_min"])
+    # else:
+    #     #Generate an array of elements the length of raster height
+    #     hdataset = np.arange(rDict["height"])
+    #     yOffSet = int(rDict["y_min"])
         
         
-        binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
-        if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
-            print("****Removing file****")
-            os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
+    #     binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
+    #     if os.path.exists("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"]): 
+    #         print("****Removing file****")
+    #         os.remove("/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/%s/pdataset.scidb" % rDict["node"])
         
-        for l, h in enumerate(np.array_split(hdataset,300)):
+    #     for l, h in enumerate(np.array_split(hdataset,300)):
              
-            print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
-            rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
-            arrayHeight, arrayWidth  = rArray.shape
+    #         print("Node: %s Writing: %s of 300, height: %s , OffSet: %s" % (rDict["node"], l+1, len(h), yOffSet + min(h)  ))
+    #         rArray = raster.ReadAsArray(xoff=0, yoff=int(yOffSet+min(h) ), xsize=rDict["width"], ysize=len(h))
+    #         arrayHeight, arrayWidth  = rArray.shape
                 
-            #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
-            ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
+    #         #print("%s,%s,%s,%s,%s,%s" % (rDict["node"], l, arrayHeight, arrayWidth, len(h), yOffSet ))
+    #         ArrayToBinary(rArray, binaryPartitionPath, 'data_array', yOffSet+min(h) )
 
     # elif rDict["height"] * rDict["width"] > 50000000 :
     #     from scidb import iquery
