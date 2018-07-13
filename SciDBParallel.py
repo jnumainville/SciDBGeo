@@ -653,6 +653,12 @@ def RemoveArrayVersions(sdb, theArrayName):
 
 def ParallelLoad(rasterReadingMetadata):
     """
+    This function is designed to load all sizes of arrays
+    We are using a couple of custom functions to break the dataset into smaller pieces for repetive parallel writing / loading and then a single redimension store
+    You can improve the performance by setting a high maxPixel threshold value. 
+
+    maxPixel = Number of pixels to read/write/load per loop.
+    Make sure to consider the number of SciDB processes when setting maxPixel 
 
     """
     from scidb import iquery, Statements
@@ -690,7 +696,7 @@ def ParallelLoad(rasterReadingMetadata):
             RemoveArrayVersions(sdb, rasterReadingMetadata[1]["destination_array"])
             
             stop = timeit.default_timer()
-            if l == 0: print("Estimated time for loading the dataset in minutes %s: RedimensionTime: %s seconds" % ( (stop-start)*loadLoops/60, stop-startRedimension))        
+            if l == 0: print("Estimated time for loading the dataset in minutes %s: LoadTime: %s seconds, RedimensionTime: %s seconds" % ( (stop-start)*loadLoops/60, stop-startLoad, stop-startRedimension))        
 
     except Exception as e:
         print(e)
@@ -711,8 +717,6 @@ def AdjustMetaData(loops, theRMD):
     sortedDict = OrderedDict( [ (r,adjustedData[r]) for r in sorted(adjustedData.keys())] )
     
     return sortedDict
-
-    
 
 
 def Read_Write_Raster(rDict):
