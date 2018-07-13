@@ -7,7 +7,7 @@ from gdalconst import GA_ReadOnly
 
 class RasterLoader(object):
 
-    def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, yOffSet=None, destinationArray=None):
+    def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, yOffSet=None):
         """
         Initialize the class RasterReader
         """
@@ -21,7 +21,7 @@ class RasterLoader(object):
 
         self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange),"height": len(heightRange), \
         "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath, "attribute": self.AttributeString, \
-        "array_shape": self.RasterArrayShape, "destination_array": destinationArray} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
+        "array_shape": self.RasterArrayShape, "destination_array": scidbArray} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
         #self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=chunksize, tiles=tiles, attribute=self.AttributeString, band=self.numbands )
         
     def RasterShapeLogic(self, attributeNames):
@@ -100,7 +100,7 @@ class RasterLoader(object):
             height, width = thePath.shape
             numbands = 1
 
-        print(width, height, rasterValueDataType, numbands)
+        # print(width, height, rasterValueDataType, numbands)
 
         return (width, height, rasterValueDataType, numbands)
 
@@ -115,10 +115,8 @@ class RasterLoader(object):
         
         
         if self.RasterArrayShape <= 2:
-            #sdb.query("create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk) )
             myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
         else:
-            #sdb.query("create array %s <%s> [band=0:%s,1; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , len(self.datatype)-1, height-1, chunk, width-1, chunk) )
             myQuery = "create array %s <%s> [band=0:%s,1,0; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, width-1, chunk)
         
         try:
@@ -609,7 +607,6 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0):
         #Add this to make it a csv tofile(binaryFilePath), "," and modify the open statement to 'w'
         np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('y','int64'),('x','int64'),(attributeName,theArray.dtype)]).ravel().tofile(fileout) 
 
-    
     del column_index, row_index, theArray
 
 
@@ -638,33 +635,68 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
             arraydatatypes.append(array.dtype)
         return (arraydatatypes)
 
+def RemoveArrayVersions(sdb, theArrayName):
+    """
+
+    """
+    
+        
+    versions = sdb.versions(theArrayName)
+    if len(versions) > 1: 
+        #print("Versions you could remove: %s" % (versions))
+        for v in versions[:-1]:
+            try:
+                sdb.query("remove_versions(%s, %s)" % (theArrayName, v) )
+            except:
+                #If we don't remove the version we don't care
+                pass
 
 def ParallelLoad(rasterReadingMetadata):
     """
 
     """
-    pool = mp.Pool(len(rasterReadingMetadata))
+    from scidb import iquery, Statements
+    import timeit
+    numProcesses = len(rasterReadingMetadata)
+    
+    sdb = iquery()
+    sdb_statements = Statements(sdb)
 
-    #ArraySplicerLogic()    
     try:
-        loadLoops = ArraySplicerLogic(rasterReadingMetadata[0]['width'], rasterReadingMetadata[0]['height'], 2000000)
-        print("Number of loops for loading: %s" % (loadLoops))
+        loadLoops = ArraySplicerLogic(rasterReadingMetadata[0]['width'], rasterReadingMetadata[0]['height'], 5000000)
+        loadAttribute = "%s_1:%s" % (rasterReadingMetadata[0]['attribute'].split(":")[0], rasterReadingMetadata[0]['attribute'].split(":")[1])
+        #print("Number of loops for loading: %s" % (loadLoops))
+        #print(loadAttribute)
         nodeLoopData = AdjustMetaData(loadLoops, rasterReadingMetadata)
+        
         # print(nodeLoopData)
-
+        start = timeit.default_timer()
         for l, nodeLoopIteration in enumerate(np.array_split(list(nodeLoopData.items()), loadLoops)):
-        # for n in nodeLoopData:
-        #     print(nodeLoopData[n])
-        
-            print("Loop %s" % (l))
-            pool.imap(Read_Write_Raster, (nodeLoopIteration[n] for n in nodeLoopIteration)  ) #
-        
-        pool.close()
-        pool.join()
+            #Have to iniate the pool for each loop
+            pool = mp.Pool(numProcesses)
+            print("Loading %s of %s" % (l, loadLoops))
+            sdb_statements.CreateLoadArray("LoadArray", loadAttribute, rasterReadingMetadata[0]['array_shape'])    
+            pool.imap(Read_Write_Raster, (n for n in nodeLoopIteration)  ) #
+            pool.close()
+            pool.join()
+
+            startLoad = timeit.default_timer()
+            sdb_statements.LoadOneDimensionalArray(-1, "LoadArray", loadAttribute, 1, 'pdataset.scidb')
+            
+            startRedimension = timeit.default_timer()
+            sdb_statements.InsertRedimension( "LoadArray", rasterReadingMetadata[1]["destination_array"], oldvalue=loadAttribute.split(":")[0], newvalue='value')
+            
+            sdb.query("remove(LoadArray)")
+            RemoveArrayVersions(sdb, rasterReadingMetadata[1]["destination_array"])
+            
+            stop = timeit.default_timer()
+            if l == 0: print("Estimated time for loading the dataset in minutes %s: RedimensionTime: %s seconds" % ( (stop-start)*loadLoops/60, stop-startRedimension))        
+
     except Exception as e:
         print(e)
         print("Error")
 
+    # sdb.query("remove('LoadArray')")
 def AdjustMetaData(loops, theRMD):
     """
     Function to adjust the metadata for proper loading
@@ -685,29 +717,33 @@ def AdjustMetaData(loops, theRMD):
 
 def Read_Write_Raster(rDict):
     """
+    This function takes as input an OrderedDict which contains the following keys:
+        node, ysize, xsize, yoff, xoff, datastore, filepath
 
+    rDict is an ordered Dictionary (key, {key, value} )
     """
     
     import os
     import numpy as np
     from osgeo import gdal
     from gdalconst import GA_ReadOnly
-
-    print("Node %s, array size h:%s, w:%s ,totalpixles: %s " % (rDict["node"],rDict["height"], rDict["width"], rDict["height"] * rDict["width"]))
-
-    raster = gdal.OpenShared(rDict["filepath"], GA_ReadOnly)
-
     
-    binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict["datastore"], rDict["node"])
+    #print(rDict)
+    print("Node %s, array size h:%s, w:%s ,totalpixles: %s " % (rDict[1]["node"],rDict[1]["ysize"], rDict[1]["xsize"], rDict[1]["ysize"] * rDict[1]["xsize"]))
+
+    raster = gdal.OpenShared(rDict[1]["filepath"], GA_ReadOnly)
+
+    binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict[1]["datastore"], rDict[1]["node"])
     if os.path.exists(binaryPartitionPath):
-         print("****Removing file****")
+         print("****Removing file****  %s" % (binaryPartitionPath))
          os.remove(binaryPartitionPath)
-
-    # if rDict["height"] * rDict["width"] < 5000000:
-        
-    rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict["y_min"]), xsize=rDict["width"], ysize=rDict["height"])
-    ArrayToBinary(rArray, binaryPartitionPath, 'data_array', rDict["y_min"])
     
+    # # if rDict["height"] * rDict["width"] < 5000000:
+    rArray = raster.ReadAsArray(xoff=0, yoff=int(rDict[1]["yoff"]), xsize=rDict[1]["xsize"], ysize=rDict[1]["ysize"])
+    #ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0)
+    ArrayToBinary(rArray, binaryPartitionPath, 'value_1', int(rDict[1]["yoff"]))
+    
+    #os.remove(binaryPartitionPath)
     # else:
     #     #Generate an array of elements the length of raster height
     #     hdataset = np.arange(rDict["height"])
@@ -777,7 +813,6 @@ def ArraySplicerLogic(width, height, maxPixels=20000000):
     This function will determine how many loops are necessary to efficiently load a large geoTiff
     maxPixels should be determined based on memory constraints of your machine
     """
-    
     if height * width < maxPixels:
         return 1
     elif width > maxPixels:
@@ -788,5 +823,3 @@ def ArraySplicerLogic(width, height, maxPixels=20000000):
         #print(solutions)
         numIterations = height / max({k: v for k, v in solutions.items()})
         return round(numIterations)
-
-            #OrderedDict([  ] )
