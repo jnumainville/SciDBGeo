@@ -691,8 +691,8 @@ def ParallelLoadByChunk(rasterReadingData):
     #We are just interested in node 0
     numberofNodeLoops = Counter(rasterReadingData[k]["node"] for k in rasterReadingData)
     loadLoops = numberofNodeLoops[0]
-
-    aKey = rasterReadingData.keys()[0]
+    # print(rasterReadingData)
+    aKey = list(rasterReadingData.keys())[0]
     loadAttribute = "%s_1:%s" % (rasterReadingData[aKey]['attribute'].split(":")[0], rasterReadingData[aKey]['attribute'].split(":")[1])
 
     # loops = numberofNodeLoops[0]
@@ -760,7 +760,7 @@ def ParallelLoad(rasterReadingMetadata):
         for l, nodeLoopIteration in enumerate(np.array_split(list(nodeLoopData.items()), loadLoops)):
             #Have to iniate the pool for each loop
             pool = mp.Pool(numProcesses)
-            print("Loading %s of %s" % (l, loadLoops-1))
+            print("Loading %s of %s" % (l+1, loadLoops))
             sdb_statements.CreateLoadArray("LoadArray", loadAttribute, rasterReadingMetadata[0]['array_shape'])    
             pool.imap(Read_Write_Raster, (n for n in nodeLoopIteration)  ) #
             pool.close()
@@ -776,7 +776,7 @@ def ParallelLoad(rasterReadingMetadata):
             RemoveArrayVersions(sdb, rasterReadingMetadata[1]["destination_array"])
             
             stop = timeit.default_timer()
-            if l == 0: print("Estimated time for loading the dataset in minutes %s: LoadTime: %s seconds, RedimensionTime: %s seconds" % ( (stop-start)*loadLoops/60, startRedimension-startLoad, stop-startRedimension))        
+            if l == 0: print("Estimated time for loading the dataset in minutes %s: WriteTime: %s seconds, LoadTime: %s seconds, RedimensionTime: %s seconds" % ( (stop-start)*loadLoops/60, startLoad- start, startRedimension-startLoad, stop-startRedimension))        
 
     except Exception as e:
         print(e)
