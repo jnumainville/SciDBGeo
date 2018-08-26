@@ -48,9 +48,9 @@ def FocalAnalysis(sdbConn, arrayTable):
     
     start = timeit.default_timer()
     #https://paradigm4.atlassian.net/wiki/spaces/scidb/pages/242745395/window
-    query = "window(%s, 1,1,1,1) average(value)" % (arrayTable)
+    query = "window(%s, 1,1,1,1, avg(value))" % (arrayTable)
     
-    results = sdbConn.query(query)
+    results = sdbConn.queryAFL(query)
     stop = timeit.default_timer()
     
     timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable), ("dataset", arrayTable.split("_")[:-1]), ("chunk", arrayTable.split("_")[0])])
@@ -193,7 +193,7 @@ if __name__ == '__main__':
 
     runs = [1]#,2,3]
     analytic = 1
-    filePath = '/mnt/zonal_4_17_2018.csv'
+    filePath = '/mnt/focal_8_25_2018.csv'
     rasterStatsCSV = '/mnt/zonalstats.csv'
 
     datasets = args.func()
