@@ -9,9 +9,9 @@ if __name__ == '__main__':
                     # "glc": {"geoTiffPath": "/home/04489/dhaynes/glc2000_clipped.tif", "arrayName": "glc_2000_clipped", "attribute": "value", "outDirectory": "/storage"}, 
                     #"meris": {"geoTiffPath": "/home/04489/dhaynes/meris_2010_clipped.tif", "arrayName": "meris_2010_clipped", "attribute": "value", "outDirectory": "/storage"}
                     #"nlcd": {"geoTiffPath": "/home/04489/dhaynes/nlcd_2006.tif", "arrayName": "nlcd_junk",  "attribute": "value", "outDirectory": "/storage"}
-                    "meris3Meter" :{"geoTiffPath": "/group/meris_3m/meris_3m.vrt", "arrayName": "meris_2010_3m",  "attribute": "value", "outDirectory": "/storage" }
+                    "meris3Meter" :{"geoTiffPath": "/group/meris_3m/meris_3m.vrt", "arrayName": "meris_2010_3m_chunk",  "attribute": "value", "outDirectory": "/storage" }
                     }
-        tileSizes = [500] #, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+        tileSizes = [1000] #, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
         sdb = iquery()
         for d in datasets:
                 #print(datasets[d])

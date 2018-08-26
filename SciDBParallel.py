@@ -724,7 +724,7 @@ def ParallelLoadByChunk(rasterReadingData):
             
             stop = timeit.default_timer()
             if l == 0: print("Estimated time for loading the dataset in minutes %s: LoadTime: %s seconds, RedimensionTime: %s seconds" % ( (stop-start)*loadLoops/60, startRedimension-startLoad, stop-startRedimension))        
-
+            
     except:
 
         print("Something went wrong")
@@ -814,17 +814,20 @@ def Read_Write_Raster(rDict):
     
     #print(rDict)
     print("Node %s, array size h:%s, w:%s ,totalpixles: %s " % (rDict[1]["node"],rDict[1]["ysize"], rDict[1]["xsize"], rDict[1]["ysize"] * rDict[1]["xsize"]))
-    print("xoff: %s, yoff: %s " % (rDict[1]["xoff"], rDict[1]["yoff"])  )
+    #print("xoff: %s, yoff: %s " % (rDict[1]["xoff"], rDict[1]["yoff"])  )
+    #print(rDict[1]["datastore"])
     raster = gdal.OpenShared(rDict[1]["filepath"], GA_ReadOnly)
 
     binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict[1]["datastore"], rDict[1]["node"])
+    #print(binaryPartitionPath)
     if os.path.exists(binaryPartitionPath):
          print("****Removing file****  %s" % (binaryPartitionPath))
          os.remove(binaryPartitionPath)
     
     # # if rDict["height"] * rDict["width"] < 5000000:
-    rArray = raster.ReadAsArray(xoff=rDict[1]["xoff"], yoff=int(rDict[1]["yoff"]), xsize=rDict[1]["xsize"], ysize=rDict[1]["ysize"])
+    rArray = raster.ReadAsArray(xoff=int(rDict[1]["xoff"]), yoff=int(rDict[1]["yoff"]), xsize=rDict[1]["xsize"], ysize=rDict[1]["ysize"])
     #ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0)
+    #print(rArray.shape)
     ArrayToBinary(rArray, binaryPartitionPath, 'value_1', int(rDict[1]["yoff"]), int(rDict[1]["xoff"]))
     
     #os.remove(binaryPartitionPath)
