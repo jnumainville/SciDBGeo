@@ -3,7 +3,7 @@ from SciDBParallel import *
 import os, timeit, csv
 from collections import OrderedDict
 
-def ZonalStatistics(dataset, theRun, summaryStatsCSV=None):
+def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
     """
     This is the functions for zonal statistics
     Each function should be completely self contained
@@ -20,7 +20,7 @@ def ZonalStatistics(dataset, theRun, summaryStatsCSV=None):
         stopRasterization = timeit.default_timer()
         SciDBInstances = raster.SciDBInstances
     
-    sdb_statements = Statements(sdb)
+    sdb_statements = Statements(sdbConn)
     
     theAttribute = 'id:%s' % (datapackage[0]) #
     sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
@@ -35,9 +35,25 @@ def ZonalStatistics(dataset, theRun, summaryStatsCSV=None):
     timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), \
         ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]), ("full_time", stopSummaryStats-start), \
         ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep) ])
-    sdb.query("remove(mask)")
-    sdb.query("remove(boundary)")
+    sdbConn.query("remove(mask)")
+    sdbConn.query("remove(boundary)")
     del raster
+
+    return timed
+
+def FocalAnalysis(sdbConn, arrayTable):
+    """
+    This function perform a focal analysis on a SciDB Array
+    """
+    
+    start = timeit.default_timer()
+    #https://paradigm4.atlassian.net/wiki/spaces/scidb/pages/242745395/window
+    query = "window(%s, 1,1,1,1) average(value)" % (arrayTable)
+    
+    results = sdbConn.query(query)
+    stop = timeit.default_timer()
+    
+    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable), ("dataset", arrayTable.split("_")[:-1]), ("chunk", arrayTable.split("_")[0])])
 
     return timed
 
@@ -79,7 +95,7 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
     else:
         insertTime = 0
 
-    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable), ("redimensionInsertTime",  insertTime) ])
+    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable),  ("redimensionInsertTime",  insertTime) ])
 
     return timed
 
@@ -163,6 +179,9 @@ def argument_parser():
     reclass_subparser = subparser.add_parser('reclassify')
     reclass_subparser.set_defaults(func=localDatasetPrep)
 
+    focal_subparser = subparser.add_parser('focal')
+    focal_subparser.set_defaults(func=localDatasetPrep)
+
     return parser
 
 if __name__ == '__main__':
@@ -186,7 +205,7 @@ if __name__ == '__main__':
             if args.command == "zonal":                  
                 print(d["raster_path"], d["shape_path"], d["array_table"])
                 rasterStatsCSV = '/mnt/zonalstats_%s_%s.csv' % (d["shape_path"].split("/")[-1].split(".")[0], d["array_table"])
-                timed = ZonalStatistics(d, r, rasterStatsCSV)
+                timed = ZonalStatistics(sdb, d, r, rasterStatsCSV)
                 timings[(r,d["array_table"])] = timed
             elif args.command =="count":
                 timed = CountPixels(sdb, d["array_table"], d["pixelValue"])
@@ -194,7 +213,11 @@ if __name__ == '__main__':
             elif args.command == "reclassify":
                 timed = Reclassify(sdb, d["array_table"], d["pixelValue"], d["newPixel"], 6)
                 timings[(r,d["array_table"])] = timed
-        
+            elif args.command == "focal":
+                timed = FocalAnalysis(sdb, d["array_table"], )
+                timings[(r,d["array_table"])] = timed
+
+
         #Remove the parallel zone files after each dataset run
         if args.command == "zonal":    
             for i in range(SciDBInstances):
