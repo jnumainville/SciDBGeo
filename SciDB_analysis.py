@@ -50,10 +50,10 @@ def FocalAnalysis(sdbConn, arrayTable):
     #https://paradigm4.atlassian.net/wiki/spaces/scidb/pages/242745395/window
     query = "window(%s, 1,1,1,1, avg(value))" % (arrayTable)
     
-    results = sdbConn.queryAFL(query)
+    results = sdbConn.query(query)
     stop = timeit.default_timer()
     
-    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable), ("dataset", arrayTable.split("_")[:-1]), ("chunk", arrayTable.split("_")[0])])
+    timed = OrderedDict( [("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable), ("dataset", "_".join(arrayTable.split("_")[:-1])), ("chunk", arrayTable.split("_")[-1])])
 
     return timed
 
@@ -70,7 +70,7 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     pixelCount = str(results.splitlines()[-1])
     print("Sum of pixel values %s for array: %s" % (pixelCount.split(" ")[-1],arrayTable) )
     
-    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable) ])
+    timed = OrderedDict( [("run", r), ("analytic", "count"), ("time", stop-start), ("array_table", arrayTable), ("dataset", "_".join(arrayTable.split("_")[:-1])), ("chunk", arrayTable.split("_")[-1]) ])
 
     return timed
 
@@ -95,7 +95,7 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
     else:
         insertTime = 0
 
-    timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable),  ("redimensionInsertTime",  insertTime) ])
+    timed = OrderedDict( [ ("run", r), ("analytic", "reclassify"), ("time", stop-start), ("array_table", arrayTable),  ("redimensionInsertTime",  insertTime), ("dataset", "_".join(arrayTable.split("_")[:-1])), ("chunk", arrayTable.split("_")[-1]) ])
 
     return timed
 
@@ -191,9 +191,9 @@ if __name__ == '__main__':
     query = sdb.queryAFL("list('instances')")
     SciDBInstances = len(query.splitlines())-1
 
-    runs = [1]#,2,3]
+    runs = [1,2,3]
     analytic = 1
-    filePath = '/mnt/focal_8_25_2018.csv'
+    filePath = '/mnt/scidb_reclassify_8_27_2018.csv'
     rasterStatsCSV = '/mnt/zonalstats.csv'
 
     datasets = args.func()
