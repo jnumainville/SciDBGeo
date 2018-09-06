@@ -104,7 +104,7 @@ def localDatasetPrep():
 
     """
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
-    raster_tables = ["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
+    raster_tables = ["nlcd_2006_clipped"]#["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
     
     
 
@@ -191,9 +191,9 @@ if __name__ == '__main__':
     query = sdb.queryAFL("list('instances')")
     SciDBInstances = len(query.splitlines())-1
 
-    runs = [1,2,3]
+    runs = [1]#,2,3]
     analytic = 1
-    filePath = '/mnt/scidb_reclassify_8_27_2018.csv'
+    filePath = '/mnt/scidb_focal2_8_27_2018.csv'
     rasterStatsCSV = '/mnt/zonalstats.csv'
 
     datasets = args.func()
@@ -216,6 +216,8 @@ if __name__ == '__main__':
             elif args.command == "focal":
                 timed = FocalAnalysis(sdb, d["array_table"], )
                 timings[(r,d["array_table"])] = timed
+
+            print(timed)
 
 
         #Remove the parallel zone files after each dataset run
