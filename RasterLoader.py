@@ -10,16 +10,16 @@ if __name__ == '__main__':
                     #"nlcd": {"geoTiffPath": "/home/04489/dhaynes/nlcd_2006.tif", "arrayName": "nlcd_junk",  "attribute": "value", "outDirectory": "/storage"}
                     #"meris3Meter" :{"geoTiffPath": "/group/meris_3m/meris_3m.vrt", "arrayName": "meris_2010_3m_chunk",  "attribute": "value", "outDirectory": "/storage" } #20000000
                     }
-        tileSizes = [1000, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+        tileSizes = [1000, 1500] #, 2000, 2500, 3000, 3500, 4000]
         sdb = iquery()
         for d in datasets:
                 #print(datasets[d])
                 for tile in tileSizes:
                 # raster = RasterLoader(datasets[d]["geoTiffPath"], datasets[d]["arrayName"], [datasets[d]["attribute"]], 0, datasets[d]["outDirectory"])
-                    raster = RasterLoader(datasets[d]["geoTiffPath"], datasets[d]["arrayName"], [datasets[d]["attribute"]], tile, datasets[d]["outDirectory"], 1,datasets[d]["memory"] )
-                
                     arrayName = "%s_%s" % (datasets[d]["arrayName"], tile)
+                    raster = RasterLoader(datasets[d]["geoTiffPath"], arrayName, [datasets[d]["attribute"]], tile, datasets[d]["outDirectory"], 1,datasets[d]["memory"] )
                     raster.CreateDestinationArray(arrayName, raster.height, raster.width, tile, 1)
                     ParallelLoadByChunk(raster.RasterReadingData)
+                    del raster
 
 
