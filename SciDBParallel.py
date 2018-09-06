@@ -7,7 +7,7 @@ from gdalconst import GA_ReadOnly
 
 class RasterLoader(object):
 
-    def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, maxPixels=10000000, yOffSet=0):
+    def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, maxPixels=10000000, yOffSet=0, overlap=0):
         """
         Initialize the class RasterReader
         """
@@ -17,6 +17,7 @@ class RasterLoader(object):
         self.GetSciDBInstances()
         self.AttributeString, self.RasterArrayShape = self.RasterShapeLogic(attribute)
         self.chunksize = chunksize
+        self.overlap = overlap
         self.dataStorePath = dataStorePath
         self.rasterPath = RasterPath
         hdataset = np.arange(self.height)
@@ -107,7 +108,7 @@ class RasterLoader(object):
 
         return (width, height, rasterValueDataType, numbands)
 
-    def CreateDestinationArray(self, rasterArrayName, height, width, chunk):
+    def CreateDestinationArray(self, rasterArrayName, height, width, chunk, overlap):
         """
         Function creates the final destination array.
         Updated to handle 3D arrays.
@@ -118,9 +119,9 @@ class RasterLoader(object):
         
         
         if self.RasterArrayShape <= 2:
-            myQuery = "create array %s <%s> [y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , height-1, chunk, width-1, chunk)
+            myQuery = "create array %s <%s> [y=0:%s,%s,%s; x=0:%s,%s,%s]" %  (rasterArrayName, self.AttributeString , height-1, chunk, overlap, width-1, chunk, overlap)
         else:
-            myQuery = "create array %s <%s> [band=0:%s,1,0; y=0:%s,%s,0; x=0:%s,%s,0]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, width-1, chunk)
+            myQuery = "create array %s <%s> [band=0:%s,1,%s; y=0:%s,%s,0; x=0:%s,%s,%s]" %  (rasterArrayName, self.AttributeString , self.numbands-1, height-1, chunk, overlap, width-1, chunk, overlap)
         
         try:
             #print(myQuery)

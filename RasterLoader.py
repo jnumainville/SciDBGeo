@@ -25,7 +25,7 @@ if __name__ == '__main__':
                 # for r in raster.RasterReadingData:
                 #     print(raster.RasterReadingData[r])
                 #rasterArrayName, height, width, chunk
-                raster.CreateDestinationArray(datasets[d]["arrayName"], raster.height, raster.width, tileSizes[0])
+                raster.CreateDestinationArray(datasets[d]["arrayName"], raster.height, raster.width, tileSizes[0], 1)
                 # ParallelLoad(raster.RasterMetadata)
                 ParallelLoadByChunk(raster.RasterReadingData)
 
