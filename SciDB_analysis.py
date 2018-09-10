@@ -99,16 +99,19 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
 
     return timed
 
-def localDatasetPrep():
+def localDatasetPrep(tableName=''):
     """
 
     """
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
-    raster_tables = ["nlcd_2006_clipped"]#["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
+    raster_tables = ["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
     
     
+    if tableName:
+        rasterTables =  [ "%s_%s_%s" % (raster, tableName, chunk) for raster in raster_tables for chunk in chunk_sizes ]    
+    else:
+        rasterTables =  [ "%s_%s" % (raster, chunk) for raster in raster_tables for chunk in chunk_sizes ]
 
-    rasterTables =  [ "%s_%s" % (raster, chunk) for raster in raster_tables for chunk in chunk_sizes ]
     datasetRuns = []
     for r in rasterTables:
         if "glc_2000_clipped" in r: 
@@ -181,6 +184,9 @@ def argument_parser():
 
     focal_subparser = subparser.add_parser('focal')
     focal_subparser.set_defaults(func=localDatasetPrep)
+
+    overlap_subparser = subparser.add_parser('overlap')
+    overlap_subparser.set_defaults(func=localDatasetPrep('overlap'))
 
     return parser
 
