@@ -27,6 +27,8 @@ class RasterLoader(object):
         "array_shape": self.RasterArrayShape, "destination_array": scidbArray} for node, heightRange in enumerate(np.array_split(hdataset,self.SciDB_Instances)) }
         
         self.RasterReadingData = self.CreateArrayMetadata(scidbArray, widthMax=self.width, heightMax=self.height, widthMin=0, heightMin=yOffSet, chunk=self.chunksize, tiles=tiles, maxPixels=maxPixels, attribute=self.AttributeString, band=self.numbands )
+        
+        self.ParalleReadingData = self.ConfigureParallelReads()
         #(self, theArray, widthMax, heightMax, widthMin=0, heightMin=0, chunk=1000, tiles=1, maxPixels=10000000, attribute='value', band=1):
     def RasterShapeLogic(self, attributeNames):
         """
@@ -210,6 +212,52 @@ class RasterLoader(object):
         #         RasterReads[r]["iterate"] = 0
             
         return RasterReads
+    
+    def ConfigureParallelReads(self):
+        """
+        The Raster Reads dictionary returns a number of reads. But SciDB Parallel load needs all instances to have something to load
+        This function fixes that
+        """
+        
+        numOfReads = len(self.RasterReadingData)
+        numOfSciDB = self.SciDB_Instances
+        
+        #This identifies all of the reads where there is enough tiles for each instance
+        numParallelReads = math.floor(numOfReads/numOfSciDB)
+        #Backing out the number of remaining tiles
+        numUnevenReads = numOfReads - (numParallelReads *numOfSciDB)
+        
+        raggedKeys = list(self.RasterReadingData.keys())[-numUnevenReads:]
+        
+        numPartitions = numOfSciDB - (len(raggedKeys) - 1)
+        
+        #Generating an array shape for splitting
+        theTile = self.RasterReadingData[raggedKeys[-1]]
+        array = np.ones((theTile['ysize'], theTile['xsize']))
+        
+        #a = np.ones((1,1))
+        parallelDict = OrderedDict( (k, self.RasterReadingData[k]) for k in list(self.RasterReadingData.keys())[:-1])
+        #newXOff = theTile['xoff']
+        row, col = list(parallelDict.keys())[-1:][0]
+        newYOff = theTile['yoff']
+        for splitArray in np.array_split(array, numPartitions):
+            y,x = splitArray.shape
+            #provide a new key
+            col += 1
+    
+            parallelDict[(row, col)]  = OrderedDict([('xoff', theTile['xoff']),\
+             ('yoff', newYOff), ('height', theTile['height']), ('width', theTile['width']),\
+             ('xsize', x), ('ysize', y), ('array_shape', theTile['array_shape']),\
+             ('attribute', theTile['attribute']), ('destination_array', theTile['destination_array']), \
+             ('chunk', theTile['chunk']), ('bands', theTile['bands']), ('datastore', theTile['datastore']),\
+             ('filepath', theTile['filepath'])])
+            
+            newYOff += y
+        
+        return parallelDict
+
+           
+        
 
 class ZonalStats(object):
 
