@@ -48,7 +48,7 @@ def FocalAnalysis(sdbConn, arrayTable):
     
     start = timeit.default_timer()
     #https://paradigm4.atlassian.net/wiki/spaces/scidb/pages/242745395/window
-    query = "window(%s, 1,1,1,1, avg(value))" % (arrayTable)
+    query = "aggregate(window(%s, 1,1,1,1, avg(value)), sum(value_avg))" % (arrayTable)
     
     results = sdbConn.query(query)
     stop = timeit.default_timer()
