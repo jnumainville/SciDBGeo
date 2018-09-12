@@ -224,37 +224,43 @@ class RasterLoader(object):
         
         #This identifies all of the reads where there is enough tiles for each instance
         numParallelReads = math.floor(numOfReads/numOfSciDB)
+        print(numOfReads, numParallelReads, numOfSciDB)
         #Backing out the number of remaining tiles
-        numUnevenReads = numOfReads - (numParallelReads *numOfSciDB)
+        numUnevenReads = int(numOfReads - (numParallelReads *numOfSciDB))
         
-        raggedKeys = list(self.RasterReadingData.keys())[-numUnevenReads:]
+        if numOfReads == numParallelReads*numOfSciDB:
+            return self.RasterReadingData
+        else:
+ 
+            raggedKeys = list(self.RasterReadingData.keys())[-numUnevenReads:]
         
-        numPartitions = numOfSciDB - (len(raggedKeys) - 1)
+            numPartitions = numOfSciDB - (len(raggedKeys) - 1)
+            #print(numOfReads, numOfSciDB, numPartitions, len(raggedKeys))
+
+            #Generating an array shape for splitting
+            theTile = self.RasterReadingData[raggedKeys[-1]]
+            array = np.ones((theTile['ysize'], theTile['xsize']))
         
-        #Generating an array shape for splitting
-        theTile = self.RasterReadingData[raggedKeys[-1]]
-        array = np.ones((theTile['ysize'], theTile['xsize']))
-        
-        #a = np.ones((1,1))
-        parallelDict = OrderedDict( (k, self.RasterReadingData[k]) for k in list(self.RasterReadingData.keys())[:-1])
-        #newXOff = theTile['xoff']
-        row, col = list(parallelDict.keys())[-1:][0]
-        newYOff = theTile['yoff']
-        for splitArray in np.array_split(array, numPartitions):
-            y,x = splitArray.shape
-            #provide a new key
-            col += 1
+            parallelDict = OrderedDict( (k, self.RasterReadingData[k]) for k in list(self.RasterReadingData.keys())[:-1])
+            #newXOff = theTile['xoff']
+            row, col = list(parallelDict.keys())[-1:][0]
+            newYOff = theTile['yoff']
+            for splitArray in np.array_split(array, numPartitions):
+                y,x = splitArray.shape
+                #provide a new key
+                col += 1
     
-            parallelDict[(row, col)]  = OrderedDict([('xoff', theTile['xoff']),\
-             ('yoff', newYOff), ('height', theTile['height']), ('width', theTile['width']),\
-             ('xsize', x), ('ysize', y), ('array_shape', theTile['array_shape']),\
-             ('attribute', theTile['attribute']), ('destination_array', theTile['destination_array']), \
-             ('chunk', theTile['chunk']), ('bands', theTile['bands']), ('datastore', theTile['datastore']),\
-             ('filepath', theTile['filepath'])])
+                parallelDict[(row, col)]  = OrderedDict([('xoff', theTile['xoff']),\
+                ('yoff', newYOff), ('height', theTile['height']), ('width', theTile['width']),\
+                ('xsize', x), ('ysize', y), ('array_shape', theTile['array_shape']),\
+                ('attribute', theTile['attribute']), ('destination_array', theTile['destination_array']), \
+                ('chunk', theTile['chunk']), ('bands', theTile['bands']), ('datastore', theTile['datastore']),\
+                ('filepath', theTile['filepath'])])
             
-            newYOff += y
+                newYOff += y
         
-        return parallelDict
+            return parallelDict
+
 
            
         
