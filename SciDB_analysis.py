@@ -104,7 +104,7 @@ def localDatasetPrep(tableName=''):
 
     """
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
-    raster_tables = ["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
+    raster_tables = ["glc_2000_clipped", "meris_2010_clipped"]#, "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
     
     
     if tableName:
@@ -186,7 +186,7 @@ def argument_parser():
     focal_subparser.set_defaults(func=localDatasetPrep)
 
     overlap_subparser = subparser.add_parser('overlap')
-    overlap_subparser.set_defaults(func=localDatasetPrep('overlap'))
+    overlap_subparser.set_defaults(func=localDatasetPrep)
 
     return parser
 
@@ -199,10 +199,12 @@ if __name__ == '__main__':
 
     runs = [1]#,2,3]
     analytic = 1
-    filePath = '/mnt/scidb_focal2_8_27_2018.csv'
+    filePath = '/mnt/scidb_focal_9_12_2018.csv'
     rasterStatsCSV = '/mnt/zonalstats.csv'
-
-    datasets = args.func()
+    if args.command == "overlap":
+        datasets = args.func('overlap')
+    else:
+        datasets = args.func()
     timings = OrderedDict()
     
     for d in datasets:
@@ -219,9 +221,10 @@ if __name__ == '__main__':
             elif args.command == "reclassify":
                 timed = Reclassify(sdb, d["array_table"], d["pixelValue"], d["newPixel"], 6)
                 timings[(r,d["array_table"])] = timed
-            elif args.command == "focal":
+            elif args.command == "focal" or args.command == "overlap":
                 timed = FocalAnalysis(sdb, d["array_table"], )
                 timings[(r,d["array_table"])] = timed
+                timeit.time.sleep(60)
 
             print(timed)
 

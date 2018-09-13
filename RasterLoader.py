@@ -11,7 +11,7 @@ if __name__ == '__main__':
                     "nlcd": {"geoTiffPath": "/home/04489/dhaynes/nlcd_2006.tif", "arrayName": "nlcd_2006_overlap",  "attribute": "value", "outDirectory": "/storage", "memory": 20000000}
                     #"meris3Meter" :{"geoTiffPath": "/group/meris_3m/meris_3m.vrt", "arrayName": "meris_2010_3m_chunk",  "attribute": "value", "outDirectory": "/storage" } #20000000
                     }
-        tileSizes = [1500] #, 2000, 2500, 3000, 3500, 4000] #500
+        tileSizes = [2000, 2500, 3000, 3500, 4000] #500
         sdb = iquery()
         for d in datasets:
                 #print(datasets[d])
