@@ -197,9 +197,9 @@ if __name__ == '__main__':
     query = sdb.queryAFL("list('instances')")
     SciDBInstances = len(query.splitlines())-1
 
-    runs = [1]#,2,3]
+    runs = [1,2,3]
     analytic = 1
-    filePath = '/mnt/scidb_focal_9_12_2018.csv'
+    filePath = '/mnt/scidb_focal_9_13_2018.csv'
     rasterStatsCSV = '/mnt/zonalstats.csv'
     if args.command == "overlap":
         datasets = args.func('overlap')
@@ -224,9 +224,12 @@ if __name__ == '__main__':
             elif args.command == "focal" or args.command == "overlap":
                 timed = FocalAnalysis(sdb, d["array_table"], )
                 timings[(r,d["array_table"])] = timed
-                timeit.time.sleep(60)
+                timeit.time.sleep(30)
 
             print(timed)
+         if args.command == "overlap" or args.command == "focal":
+             print("Pausing for 2 minutes between datasets") 
+             timeit.time.sleep(120)
 
 
         #Remove the parallel zone files after each dataset run
