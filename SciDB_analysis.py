@@ -227,9 +227,10 @@ if __name__ == '__main__':
                 timeit.time.sleep(30)
 
             print(timed)
-         if args.command == "overlap" or args.command == "focal":
-             print("Pausing for 2 minutes between datasets") 
-             timeit.time.sleep(120)
+        
+        if args.command == "overlap" or args.command == "focal":
+            print("Pausing for 2 minutes between datasets") 
+            timeit.time.sleep(120)
 
 
         #Remove the parallel zone files after each dataset run
