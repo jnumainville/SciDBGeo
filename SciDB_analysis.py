@@ -20,24 +20,25 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
         stopRasterization = timeit.default_timer()
         SciDBInstances = raster.SciDBInstances
     
-    sdb_statements = Statements(sdbConn)
+        sdb_statements = Statements(sdbConn)
     
-    theAttribute = 'id:%s' % (datapackage[0]) #
-    sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
-    sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
-    #SciDB Load operator -1 loads in parallel
-    numDimensions = raster.CreateMask(datapackage[0], 'mask')
-    redimension_time = raster.InsertRedimension( 'boundary', 'mask', raster.tlY, raster.tlX )
+        theAttribute = 'id:%s' % (datapackage[0]) #
+        sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
+        sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
+        #SciDB Load operator -1 loads in parallel
+        numDimensions = raster.CreateMask(datapackage[0], 'mask')
+        redimension_time = raster.InsertRedimension( 'boundary', 'mask', raster.tlY, raster.tlX )
 
     summaryStatTime = raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, 1, summaryStatsCSV)
     stopSummaryStats = timeit.default_timer()            
     
     timed = OrderedDict( [("connectionInfo", "XSEDE"), ("run", r), \
         ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]), ("full_time", stopSummaryStats-start), \
-        ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep) ])
-    sdbConn.query("remove(mask)")
-    sdbConn.query("remove(boundary)")
-    del raster
+        ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep),\
+        ("dataset", "_".join(d["array_table"].split("_")[:-1])), ("chunk", d["array_table"].split("_")[-1]) ])
+    #sdbConn.query("remove(mask)")
+    #sdbConn.query("remove(boundary)")
+    #del raster
 
     return timed
 
@@ -104,7 +105,7 @@ def localDatasetPrep(tableName=''):
 
     """
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
-    raster_tables = ["glc_2000_clipped", "meris_2010_clipped"]#, "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
+    raster_tables = ["meris_2010_clipped"]#["glc_2000_clipped", "meris_2010_clipped"]#, "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
     
     
     if tableName:
@@ -135,10 +136,10 @@ def zonalDatasetPrep():
     """
     
 
-    chunk_sizes = [500] #, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+    chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
     raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006.tif"]
-    shapefiles = ["/home/04489/dhaynes/shapefiles/states.shp"]#["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/regions.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
+    shapefiles = ["/home/04489/dhaynes/shapefiles/tracts2.shp","/home/04489/dhaynes/shapefiles/states.shp","/home/04489/dhaynes/shapefiles/regions.shp","/home/04489/dhaynes/shapefiles/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
     rasterPaths =  [ raster_path for raster_path in raster_paths for chunk in chunk_sizes ]
@@ -197,9 +198,9 @@ if __name__ == '__main__':
     query = sdb.queryAFL("list('instances')")
     SciDBInstances = len(query.splitlines())-1
 
-    runs = [1,2,3]
+    runs = [1]#,2,3]
     analytic = 1
-    filePath = '/mnt/scidb_focal_9_13_2018.csv'
+    filePath = '/mnt/scidb_zonal_9_13_2018.csv'
     rasterStatsCSV = '/mnt/zonalstats.csv'
     if args.command == "overlap":
         datasets = args.func('overlap')
@@ -224,13 +225,13 @@ if __name__ == '__main__':
             elif args.command == "focal" or args.command == "overlap":
                 timed = FocalAnalysis(sdb, d["array_table"], )
                 timings[(r,d["array_table"])] = timed
-                timeit.time.sleep(30)
+                timeit.time.sleep(120)
 
             print(timed)
         
         if args.command == "overlap" or args.command == "focal":
-            print("Pausing for 2 minutes between datasets") 
-            timeit.time.sleep(120)
+            print("Pausing for 8 minutes between datasets") 
+            timeit.time.sleep(480)
 
 
         #Remove the parallel zone files after each dataset run
