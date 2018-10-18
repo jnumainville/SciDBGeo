@@ -62,6 +62,26 @@ def FocalAnalysis(sdbConn, arrayTable):
 
     return timed
 
+
+def TwoRasterAdd(sdbConn, arrayTable):
+    """
+    This function will return the sum of the pixels in a SciDB Array
+    """
+    
+    start = timeit.default_timer()
+
+    query = "aggregate(filter(%s, ), sum(value)" % (arrayTable)
+    results = sdbConn.query(query)
+    
+    stop = timeit.default_timer()
+    pixelCount = str(results.splitlines()[-1])
+    #print("Sum of pixel values %s for array: %s" % (pixelCount.split(" ")[-1],arrayTable) )
+    
+    timed = OrderedDict( [("run", r), ("analytic", "raster_add"), ("time", stop-start), ("array_table", arrayTable), ("dataset", "_".join(arrayTable.split("_")[:-1])), ("chunk", arrayTable.split("_")[-1]) ])
+
+    return timed
+
+
 def CountPixels(sdbConn, arrayTable, pixelValue):
     """
     This function will return the sum of the pixels in a SciDB Array
@@ -69,8 +89,11 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     
     start = timeit.default_timer()
     query = "SELECT count(value) from %s WHERE value = %s" % (arrayTable, pixelValue)
-    
     results = sdbConn.aql_query(query)
+
+    query = "aggregate(filter(%s, ), sum(value)" % (arrayTable, pixelValue)
+    results = sdbConn.query(query)
+    
     stop = timeit.default_timer()
     pixelCount = str(results.splitlines()[-1])
     print("Sum of pixel values %s for array: %s" % (pixelCount.split(" ")[-1],arrayTable) )
