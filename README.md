@@ -1,7 +1,14 @@
-# scidb_analysis
-Code for analysing big raster datasets in SciDB
+# SciDBGeo Repo
+The repo contains code for loading and analyzing geospatial (raster) data in SciDB
 
-1) GDALtoSciDB_multiprocessing script is a python file that will load your datasets into SciDB Clsuter using multiple SciDB instances. This is compatible with single instances
+
+### Project Structure
+
+
+### Project Files
+
+1. GDALtoSciDB_multiprocessing script is a python file that will load your datasets into SciDB Clsuter using multiple SciDB instances. This is compatible with single instances
+```
 usage: GDALtoSciDB_multiprocessing.py [-h] -Instances
                                       [INSTANCES [INSTANCES ...]] -Host HOST
                                       -RasterPath RASTERPATH -SciDBArray
@@ -10,9 +17,9 @@ usage: GDALtoSciDB_multiprocessing.py [-h] -Instances
                                       [-Overlap OVERLAP] [-TempOut OUTPATH]
                                       [-SciDBLoadPath SCIDBLOADPATH]
                                       [-CSV CSV]
-
+```
 multiprocessing module for loading GDAL read data into SciDB with 1 or more instances
-
+```
 optional arguments:
     -h, --help              show this help message and exit
     -Instances [INSTANCES [INSTANCES ...]]
@@ -30,13 +37,15 @@ optional arguments:
     -TempOut OUTPATH
     -SciDBLoadPath          SCIDBLOADPATH
     -CSV CSV                Create CSV file, which logs all of the loading times
+```
 
-
-2) SciDB_ZonalStats_CL is a command line script for conducting zonal stats
+1. SciDB_ZonalStats_CL is a command line script for conducting zonal stats
+```
 usage: SciDB_ZonalStats_CL.py [-h] -SciDBArray SCIARRAY -Raster RASTER
                                 -Shapefile SHAPEFILE [-Tests RUNS] -Mode MODE
                                 [-CSV CSV] [-v] [-Host HOST]
-
+```
+```
 optional arguments:
   -h, --help            show this help message and exit
   -SciDBArray SCIARRAY      The SciDB Array to analyze
@@ -47,6 +56,5 @@ optional arguments:
   -CSV CSV                  File for results
   -v                        Verbose, print all commands to screen                  
   -Host HOST                SciDB host for connection / "NoSHIM"
+```
 
-
-3) GDAltoSciDB script is a single core implementation of the script (outdated)
