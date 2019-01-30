@@ -58,3 +58,15 @@ optional arguments:
   -Host HOST                SciDB host for connection / "NoSHIM"
 ```
 
+1. SciDB_Analyis is contains the functions used for performing spatial analyses in SciDB
+Depends on 
+```
+usage: SciDB_analysis.py 
+usage: SciDB_analysis.py [-h] [-csv CSV]
+                         {zonal,count,reclassify,focal,overlap,add} ...
+```
+```
+optional arguments:
+  -h, --help            show this help message and exit
+  -csv                  Output timing results to CSV file
+```
