@@ -22,9 +22,7 @@ def world2Pixel(geoMatrix, x, y):
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
     xDist = geoMatrix[1]
-    yDist = geoMatrix[5]
-    rtnX = geoMatrix[2]
-    rtnY = geoMatrix[4]
+
     pixel = int((x - ulX) / xDist)
     line = int((ulY - y) / xDist)
     
@@ -81,17 +79,9 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     import re    
     tempArray = "mask"
 
-    #afl = sdb.afl
-    #theArray = afl.show(SciDBArray)
-    #results = theArray.contents()
-
     results = sdb.queryAFL("show(%s)" % (SciDBArray))
     results = results.decode("utf-8")
-    #print(results)
-    #SciDBArray()\n[('polygon<x:int64,y:int64,id:int16> [xy=0:*:0:1000000]')]\n
-    #[('GLC2000<value:uint8> [x=0:40319:0:100000; y=0:16352:0:100000]')]
-    
-    #R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>\S+)(\])')
+
     R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>[^\]]+)')
     results = results.lstrip('results').strip()
     match = R.search(results)
@@ -122,13 +112,11 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     insertTime = stop-start
     if verbose: print(sdbquery , insertTime)
 
-    #between(GLC2000, 4548, 6187, 7332, 12662)
     start = timeit.default_timer()
     sdbquery = "grouped_aggregate(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), id)" % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX)
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     queryTime = stop-start
-    #sdb.queryResults(sdbquery, r"/home/04489/dhaynes/%s_states2.csv" % (SciDBArray) )
     if verbose: print(sdbquery, queryTime)
     sdb.query("remove(%s)" % tempArray)
     sdb.query("remove(%s)" % tempRastName)
@@ -158,8 +146,6 @@ def ArrayToBinary(theArray, yOffSet=0):
     dataset = np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatatypes)
 
     return dataset
-    #return dataset.ravel().tobytes()
-        
     
 
 def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0 ):
@@ -172,8 +158,6 @@ def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0 ):
         it = np.nditer(rArray, flags=['multi_index'], op_flags=['readonly'])
         for counter, pixel in enumerate(it):
             col, row = it.multi_index
-            #if counter < 100: 
-            #print("y/column: %s, x/row: %s" % (col + yOffset, row + xOffset))
             indexvalue = np.array([col + yOffset, row + xOffset], dtype=np.dtype('int64'))
 
             fileout.write( indexvalue.tobytes() )
@@ -191,14 +175,11 @@ def WriteFile(filePath, theDictionary):
     
     with open(filePath, 'w') as csvFile:
         fields = list(theDictionary[thekeys[0]].keys())
-        #fields.append("test")
-        #print(fields)
+
         theWriter = csv.DictWriter(csvFile, fieldnames=fields)
         theWriter.writeheader()
 
         for k in theDictionary.keys():
-            #theDictionary[k].update({"test": k})
-            #print(theDictionary)
             theWriter.writerow(theDictionary[k])
 
 def QueryResults():
@@ -208,7 +189,6 @@ def QueryResults():
 
     afl = sdb.afl
     result = afl.grouped_aggregate(afl.join(polygonSciDBArray.name, afl.subarray(SciDBArray, ulY, ulX, lrY, lrX)), max("value"), "f0")
-    #query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), count(value), f0)" % (polygonSciDBArray.name, SciDBArray, ulY, ulX, lrY, lrX)
 
 
 def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim1="y", dim2="x", verbose=False, loadMode=-2):
@@ -225,10 +205,6 @@ def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim
         binaryLoadPath : complete path to where the file is written (*.scidb)
     """
 
-    #chunksize = int(input("Please input chunksize: "))
-    #if isinstance(chunksize, int):
-
-    #binaryLoadPath = '%s/%s.scidb' % (tempSciDBLoad,tempRastName )
     try:
         sdbquery = "create array %s <%s:int64, %s:int64, id:%s> [xy=0:*,?,?]" % (tempRastName, dim1, dim2, rasterValueDataType)
         sdb.query(sdbquery)
@@ -294,7 +270,6 @@ def WriteBinaryFile(params):
     datastore, chunk = params[1]
 
     binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
-    #print(binaryPartitionPath)
     with open(binaryPartitionPath, 'wb') as fileout:
         fileout.write(chunk.ravel().tobytes())
 
@@ -305,12 +280,10 @@ def ParallelProcessing(params):
 
     binaryPath = params[0]
     yOffSet = params[1]
-    #print(yOffSet)
     datastore, arrayChunk = params[2]
 
     binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
-    #print(binaryPartitionPath)
-    
+
     with open(binaryPartitionPath, 'wb') as fileout:
         fileout.write(ArrayToBinary(arrayChunk, yOffSet).ravel().tobytes())
         print(binaryPartitionPath)
@@ -322,7 +295,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
     for t in range(NumberofTests):
         theTest = "test_%s" % (t+1)
-        #outDictionary[theTest]
 
         vectorFile = ogr.Open(boundaryPath)
         theLayer = vectorFile.GetLayer()
@@ -359,9 +331,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
                 polygonSciDBArray = sdb.from_array(rasterizedArray, instance_id=0, persistent=False, chunk_size=chunksize) 
                 stop = timeit.default_timer()
                 transferTime = stop-start
-            
-            #polygonSciDBArray = sdb.from_array(rasterizedArray, dim_low=(4000,5000), dim_high=(5000,7000), instance_id=0, chunk_size=1000) 
-            #name="states"
+
         
             queryTime = SubArray_SummaryStats(sdb, polygonSciDBArray.name, SciDBArray, ulX, ulY, lrX, lrY, verbose)
 
@@ -405,7 +375,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             
             print("Loading 1D File")
             start = timeit.default_timer()
-            #binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0/0'  #binaryPartitionPath.split("/")[-1]
             LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -2)
             stop = timeit.default_timer()
             print("Took: %s" % (stop-start))    
@@ -451,7 +420,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             
             print("Loading...")
             start = timeit.default_timer()
-            binaryLoadPath = "p_zones.scidb" #'/data/projects/services/scidb/scidbtrunk/stage/DB-mydb/0'  #binaryPartitionPath.split("/")[-1]
+            binaryLoadPath = "p_zones.scidb"
             LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
             stop = timeit.default_timer()
             print("Took: %s" % (stop-start))
@@ -485,11 +454,7 @@ def argument_parser():
     parser.add_argument('-Mode', help="This allows you to choose the mode of analysis you want to conduct", type=int, default=1, required=True, dest='mode')
     parser.add_argument('-CSV', required=False, dest='CSV')
     parser.add_argument('-v', required=False, action="store_true", default=False, dest='verbose')
-    parser.add_argument('-Host', required=False, help="SciDB host for connection", dest="host", default="http://localhost:8080")     
-
-    # group = parser.add_mutually_exclusive_group()
-    # group.add_argument("-v", "--verbose", action="store_true")
-    # group.add_argument("-q", "--quiet", action="store_true")   
+    parser.add_argument('-Host', required=False, help="SciDB host for connection", dest="host", default="http://localhost:8080")
     return parser
 
 if __name__ == '__main__':
@@ -501,7 +466,6 @@ if __name__ == '__main__':
             print("No SHIM")
         else:
             from scidbpy import connect  
-            #sdb = connect('http://iuwrang-xfer2.uits.indiana.edu:8080')
             sdb = connect(args.host)
         ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
     else:

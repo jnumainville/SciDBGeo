@@ -12,9 +12,7 @@ def world2Pixel(geoMatrix, x, y):
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
     xDist = geoMatrix[1]
-    yDist = geoMatrix[5]
-    rtnX = geoMatrix[2]
-    rtnY = geoMatrix[4]
+
     pixel = int((x - ulX) / xDist)
     line = int((ulY - y) / xDist)
     
@@ -29,9 +27,7 @@ def Pixel2world(geoMatrix, row, col):
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
     xDist = geoMatrix[1]
-    yDist = geoMatrix[5]
-    rtnX = geoMatrix[2]
-    rtnY = geoMatrix[4]
+
     x_coord = (ulX + (row * xDist))
     y_coord = (ulY - (col * xDist))
 

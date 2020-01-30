@@ -40,9 +40,6 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
         ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]), ("full_time", stopSummaryStats-start), \
         ("join_time", summaryStatTime), ("redimension_time", redimension_time), ("rasterize_time", stopRasterization-stopPrep),\
         ("dataset", "_".join(d["array_table"].split("_")[:-1])), ("chunk", d["array_table"].split("_")[-1]), ("load_time", loadTime) ])
-    #sdbConn.query("remove(mask)")
-    #sdbConn.query("remove(boundary)")
-    #del raster
 
     return timed
 
@@ -52,7 +49,6 @@ def FocalAnalysis(sdbConn, arrayTable):
     """
     
     start = timeit.default_timer()
-    #https://paradigm4.atlassian.net/wiki/spaces/scidb/pages/242745395/window
     query = "aggregate(window(%s, 1,1,1,1, avg(value)), sum(value_avg))" % (arrayTable)
     
     results = sdbConn.query(query)
@@ -74,9 +70,7 @@ def TwoRasterAdd(sdbConn, arrayTable):
     results = sdbConn.query(query)
     
     stop = timeit.default_timer()
-    pixelCount = str(results.splitlines()[-1])
-    #print("Sum of pixel values %s for array: %s" % (pixelCount.split(" ")[-1],arrayTable) )
-    
+
     timed = OrderedDict( [("run", r), ("analytic", "raster_add"), ("time", stop-start), ("array_table", arrayTable), ("dataset", "_".join(arrayTable.split("_")[:-1])), ("chunk", arrayTable.split("_")[-1]) ])
 
     return timed
@@ -110,8 +104,7 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
     
     start = timeit.default_timer()
     query = "aggregate(apply(%s, value2, iif(value = %s, %s, 0)), sum(value2))" % (arrayTable, oldValue, newValue)
-    #query = "apply(%s, value2, iif(value = %s, %s, -999))" % (arrayTable, oldValue, newValue)
-    
+
     results = sdbConn.query(query)
     stop = timeit.default_timer()
     Statement = Statements(sdbConn)
@@ -166,7 +159,7 @@ def zonalDatasetPrep():
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped","meris2015_clipped", "nlcd_2006_clipped"]
     raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif","/home/04489/dhaynes/meris_2010_clipped.tif", "/home/04489/dhaynes/nlcd_2006.tif"]
-    shapefiles = ["/group/shapefiles/4326/states.shp","/group/shapefiles/4326/regions.shp","/group/shapefiles/4326/counties.shp"]#,"/home/04489/dhaynes/shapefiles/tracts.shp"]
+    shapefiles = ["/group/shapefiles/4326/states.shp","/group/shapefiles/4326/regions.shp","/group/shapefiles/4326/counties.shp"]
 
     arrayTables =  [ "%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes ]
     rasterPaths =  [ raster_path for raster_path in raster_paths for chunk in chunk_sizes ]

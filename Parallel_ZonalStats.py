@@ -33,10 +33,6 @@ def argument_parser():
     parser.add_argument('-csv', required=False, dest='csv')
     parser.add_argument('-o', required=False, dest='outpath')
 
-
-    # group = parser.add_mutually_exclusive_group()
-    # group.add_argument("-v", "--verbose", action="store_true")
-    # group.add_argument("-q", "--quiet", action="store_true")   
     return parser
 
 if __name__ == '__main__':
@@ -55,13 +51,12 @@ if __name__ == '__main__':
         datapackage = ParallelRasterization(raster.arrayMetaData)
         sdb_statements = Statements(sdb)
 
-        theAttribute = 'id:%s' % ('int32') #datapackage[0]
+        theAttribute = 'id:%s' % ('int32')
         
         sdb_statements.CreateLoadArray('boundary', theAttribute , 2)
         sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')
         #Load operator -1 in parallel
-        numDimensions = raster.CreateMask('int32', 'mask') #datapackage[0]
-        #raster.GlobalJoin_SummaryStats(raster.SciDBArrayName, 'boundary', 'mask', raster.tlY, raster.tlX, raster.lrY, raster.lrX, numDimensions, args.band, args.csv)
+        numDimensions = raster.CreateMask('int32', 'mask')
 
         reclassText = ReadReclassTxt(args.shapefile)
         csvOut = '%s.csv' % (args.shapefile.split('.')[0])
@@ -77,8 +72,6 @@ if __name__ == '__main__':
         maskCsvOut = '%s_mask.csv' % (args.shapefile.split('.')[0])
         maskTiffOut = '%s_mask.tiff' % (args.shapefile.split('.')[0])
         print("**************outputing mask*************")
-        #maskQuery = "between(mask, 8551, 8935, 10515, 10572)"
-        #maskQuery = "apply(boundary, x, x1+8935, y, y1+8551, value, id)"
         maskQuery = "scan(boundary)"
         raster.sdb.queryCSV(maskQuery, maskCsvOut)
         dataArray = sdb.OutputToArray(maskCsvOut, valueColumn=3, yColumn=1)
@@ -92,8 +85,6 @@ if __name__ == '__main__':
         raster.sdb.query(Output2D_Image)
         dataArray = sdb.OutputToArray(dataCsvOut, valueColumn=0, yColumn=1)
         raster.WriteRaster(dataArray, dataTiffOut, noDataValue=-999)
-     
 
-        # ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
     else:
         print(args.shapefile, args.raster)

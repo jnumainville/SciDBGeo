@@ -12,7 +12,7 @@ def CreateDestinationArray(sdb, rasterArrayName, attribute, rasterValueDataType,
     Create the destination array
 
     Input:
-    sdb = connection to the SciDB host
+    sdb = Connection to the SciDB host
     rasterArrayName = Name of the destination array
     attribute = Name of the destination array
     rasterValueDataType = Data type of the raster array

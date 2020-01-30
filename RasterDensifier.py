@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Dec 18 15:34:23 2017
 This script will densify a given raster dataset
-@author: dahaynes
 """
 
 from osgeo import gdal
@@ -51,11 +49,9 @@ def main(inRasterFilePath, densifier, iterator, outRasterFilePath ):
     
     numCols = r.RasterXSize
     numRows = r.RasterYSize
-    #print(numRows, numCols)
-    
+
     #Create new raster file
     tiffDriver = gdal.GetDriverByName('GTiff')
-    #driver.Create(fpath, cols, rows, 1, gdal.GDT_UInt32, ['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=IF_NEEDED', 'TFW=YES']
     theRast = tiffDriver.Create(outRasterFilePath, numCols*densifier , numRows*densifier, 1, rasterType, options = [ 'TILED=YES' ])
     if theRast:
         theRast.SetProjection(rasterProjection)
@@ -71,17 +67,13 @@ def main(inRasterFilePath, densifier, iterator, outRasterFilePath ):
                 array = r.ReadAsArray(yoff=row, xoff=0 , xsize=r.RasterXSize, ysize=iterator)
             else:
                 rowCounter -= iterator
-                #print(r.RasterYSize, rowCounter)
                 array = r.ReadAsArray(yoff=row, xoff=0 , xsize=r.RasterXSize, ysize=r.RasterYSize-rowCounter)
             
-            #print(row, rowCounter, array.shape)
             densifiedArray = densification(array, densifier)
             theBand.WriteArray(densifiedArray, yoff=row*densifier)
             theBand.FlushCache()
             del densifiedArray
-            
-            #write_raster(outRasterFilePath, densifiedArray, row)
-        
+
         #Necessary to close and write the raster
         del theRast
         
@@ -121,10 +113,6 @@ def argument_parser():
     return parser
 
 
-#inR = r"c:\scidb\glc2000_clipped.tif"
-#outR = r"c:\scidb\glc2000_clipped2x.tif"
-#main(inR, 2, 100, outR)
-
 if __name__ == '__main__':
     args = argument_parser().parse_args()
     if os.path.isfile(args.input):
@@ -134,7 +122,6 @@ if __name__ == '__main__':
         for f in files:
             theInTiffPath = "%s/%s" % (args.input, f)
             theOutTiffPath = "%s/%s" % (args.output, f)
-            #print(theInTiffPath, theOutTiffPath)
             main(theInTiffPath, args.dense, args.iter, theOutTiffPath)
         
         tileFiles = "%s\%s" % (args.output, "tiles.txt")
