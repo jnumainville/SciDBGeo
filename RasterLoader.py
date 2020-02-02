@@ -1,5 +1,5 @@
-from SciDBParallel import RasterLoader, ParallelLoad, ParallelLoadByChunk
-from scidb import iquery, Statements
+from SciDBParallel import RasterLoader, ParallelLoadByChunk
+from scidb import iquery
 
 
 if __name__ == '__main__':

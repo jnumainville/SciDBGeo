@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec 02 15:02:14 2016
 A command line tool for conducting Zonal Statistics in SciDB
-
-@author: dahaynes
 """
 
 
