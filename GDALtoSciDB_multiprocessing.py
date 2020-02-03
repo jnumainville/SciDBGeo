@@ -14,13 +14,14 @@ class RasterReader(object):
         Initialize the class RasterReader
 
         Input:
-            RasterPath =
-            scidbArray =
-            attribute =
-            chunksize =
-            tiles =
+            RasterPath = Input file path for the raster
+            scidbArray = Name of the destination array
+            attribute = Name of the attribute(s) for the destination array
+            chunksize = Chunk size for the destination array
+            tiles = Size in rows of the read window
 
         Output:
+            A initialization of the RasterReader class
         """
         
         self.width, self.height, self.datatype, self.numbands = self.GetRasterDimensions(RasterPath)
@@ -35,9 +36,10 @@ class RasterReader(object):
         This function will provide the logic for determining the shape of the raster
 
         Input:
-            attributeNames =
+            attributeNames = Name of the attribute(s) for the destination array
 
         Output:
+            A tuple containing the attribute string and type of array
         """
         if len(attributeNames) >= 1 and self.numbands > 1:
             # Each pixel value will be a new attribute
@@ -57,8 +59,7 @@ class RasterReader(object):
             arrayType = 1
             
         return (attString, arrayType)
-            
-            
+
     def GetMetadata(self, scidbInstances, rasterFilePath, outPath, loadPath, band):
         """
         Generator for the class
@@ -66,11 +67,12 @@ class RasterReader(object):
         Input: 
             scidbInstances = SciDB Instance IDs
             rasterFilePath = Absolute Path to the GeoTiff
-            outPath =
-            loadPath =
-            band =
+            outPath = The out path for the SciDB instance
+            loadPath = The path to load from for the SciDB instance
+            band = The band number to get the data from
 
         Output:
+            None
         """
         
         for key, process, filepath, outDirectory, loadDirectory, band in zip(self.RasterMetadata.keys(),
@@ -86,9 +88,10 @@ class RasterReader(object):
         Function gets the dimensions of the raster file
 
         Input:
-            thePath =
+            thePath = Input file path for the raster
 
         Output:
+            A tuple containing the width, height, data type, and number of bands
         """
 
         raster = gdal.Open(thePath, GA_ReadOnly)
@@ -117,12 +120,13 @@ class RasterReader(object):
         Updated to handle 3D arrays.
 
         Input:
-            rasterArrayName =
-            height =
-            width =
-            chunk =
+            rasterArrayName = Name of the destination array
+            height = The height of the raster
+            width = The width of the raster
+            chunk = The size of the chunks
 
         Output:
+            None
         """
         
         import scidb
@@ -151,23 +155,22 @@ class RasterReader(object):
     def CreateArrayMetadata(self, theArray, width, height, chunk=1000, tiles=1, attribute='value', band=1):
         """
         This function gathers all the metadata necessary
-        The loops are
 
         Input:
-            theArray =
-            width =
-            height =
-            chunk =
-            tiles =
-            attribute =
-            band =
+            theArray = Name of the destination array
+            width = Width of the raster
+            height = Height of the raster
+            chunk = Chunk size for the destination array
+            tiles = Size in rows of the read window
+            attribute = Attribute string
+            band = The number of bands
 
         Output:
+            The raster reads
         """
         
         RasterReads = OrderedDict()
         rowMax = 0
-        
 
         for y_version, yOffSet in enumerate(range(0, height, chunk)):
             # Adding +y_version will stagger the offset
@@ -213,11 +216,12 @@ def GlobalRasterLoading(sdb, theMetadata, theDict):
     I think redimensioning affects the performance of the load if they run concurrently
 
     Input:
-        sdb =
-        theMetadata =
-        theDict =
+        sdb = SciDB instance
+        theMetadata = Class with raster information
+        theDict = Dictionary containing timing information for MetaData
 
     Output:
+        Given theDict with redimension information attache
     """
 
     theData = theMetadata.RasterMetadata
@@ -250,15 +254,19 @@ def GlobalRasterLoading(sdb, theMetadata, theDict):
 
     return theDict
 # @profile
+
+
 def GDALReader(inParams):
     """
     This is the main worker function.
     Split up Loading and Redimensioning. Only Loading is multiprocessing
 
     Input:
-        inParams =
+        inParams = An array containing the metadata, the instance, the raster path, the out path for the SciDB, the load
+        path for the SciDB, and the band index
 
     Output:
+        A tuple containing metadata, write time, and load time
     """
     theMetadata = inParams[0]
     theInstance = inParams[1]
@@ -280,7 +288,7 @@ def GDALReader(inParams):
 
     raster = gdal.Open(theRasterPath, GA_ReadOnly)
     if bandIndex:
-        #This code is for multibanded arrays, with z (band) dimension.
+        # This code is for multibanded arrays, with z (band) dimension.
         print("**** Reading band %s" % (bandIndex))
         band = raster.GetRasterBand(bandIndex)
         array = band.ReadAsArray(xoff=theMetadata['xOffSet'], yoff=theMetadata['yOffSet'],
@@ -338,9 +346,10 @@ def ArrayDimension(anyArray):
     Return the number of rows and columns for 2D or 3D array
 
     Input:
-        anyArray =
+        anyArray = The input array to measure
 
     Output:
+        The number of rows and columns
     """
     if anyArray.ndim == 2:
         return anyArray.shape
@@ -353,13 +362,14 @@ def WriteArray(theArray, binaryFilePath, arrayType, attributeName='value', bandI
     This function uses numpy tricks to write a numpy array in binary format with indices
 
     Input:
-        theArray =
-        binaryFilePath =
-        arrayType =
-        attributeName =
-        bandID =
+        theArray = Array to write
+        binaryFilePath = File path to write to
+        arrayType = Type of the array
+        attributeName = Attribute to write
+        bandID = ID of band to write
 
     Output:
+        None
     """
     print("Writing %s" % (binaryFilePath))
     col, row = ArrayDimension(theArray)
@@ -416,10 +426,11 @@ def WriteFile(filePath, theDictionary):
     This function writes out the dictionary as csv
 
     Input:
-        filePath =
-        theDictionary =
+        filePath = Path to write to
+        theDictionary = Dictionary to write
 
     Output:
+        None
     """
 
     thekeys = list(theDictionary.keys())
@@ -438,12 +449,13 @@ def CreateLoadArray(sdb, tempRastName, attribute_name, rasterArrayType):
     Create the loading array
 
     Input:
-        sdb =
-        tempRastName =
-        attribute_name =
-        rasterArrayType =
+        sdb = Instance to create array in
+        tempRastName = Name of the array to create
+        attribute_name = Attribute to create with
+        rasterArrayType = Type of the array to create
 
     Output:
+        None
     """
     
     if rasterArrayType <= 2:
@@ -464,14 +476,15 @@ def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, RasterArrayShape, xOff
     Function for redimension and inserting data from the temporary array into the destination array
 
     Input:
-        sdb =
+        sdb = SciDB instance to redimension and insert into
         tempArray =
-        SciDBArray =
-        RasterArrayShape =
-        xOffSet =
-        yOffSet =
+        SciDBArray = Metadata for array
+        RasterArrayShape = Shape of the array to redimension and insert
+        xOffSet = Offset in x for redimension
+        yOffSet = Offset in y for redimension
 
     Output:
+        None
     """
     
     if RasterArrayShape <= 2:
@@ -497,17 +510,18 @@ def RemoveTempArray(sdb, tempRastName):
     Remove the temporary array
 
     Input:
-        sdb =
-        tempRastName =
+        sdb = SciDB instance to remove from
+        tempRastName = Temporary raster to remove
 
     Output:
+        None
     """
     sdb.query("remove(%s)" % (tempRastName))
 
 
 def GetNumberofSciDBInstances():
     """
-    Description
+    Get the number of running SciDB instances
 
     Input:
         None
@@ -532,12 +546,13 @@ def MultiProcessLoading(Rasters, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     Python instance
 
     Input:
-        Rasters =
-        rasterFilePath =
-        SciDBOutPath =
-        SciDBLoadPath =
+        Rasters = Class with raster information
+        rasterFilePath = Absolute path to the raster
+        SciDBOutPath = The out path for the SciDB instance
+        SciDBLoadPath = The path to load from for the SciDB instance
 
     Output:
+        Dictionary containing version, writeTime, and loadTime for metadata
     """
     SciDBInstances = GetNumberofSciDBInstances()
     pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)    
@@ -577,6 +592,7 @@ def argument_parser():
     parser = argparse.ArgumentParser(description="multiprocessing module for loading GDAL read data into SciDB with "
                                                  "multiple instances")
     # If host = NoSHIM, then use the cmd iquery
+    # parser.add_argument("-Host", required=True, help="SciDB host for connection", dest="host", default="localhost")
     parser.add_argument("-r", required=True, help="Input file path for the raster", dest="rasterPath")    
     parser.add_argument("-a", required=True, help="Name of the destination array", dest="arrayName")
     parser.add_argument("-n", required=True, nargs='*', help="Name of the attribute(s) for the destination array",
