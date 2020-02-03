@@ -147,7 +147,7 @@ class iquery(object):
         The names of the listed items
         """
 
-        scidbArguments = """iquery -aq "list('%s')"; """ % (item)
+        scidbArguments = """iquery -aq "list('%s')"; """ % item
 
         p = self.subprocess.Popen(scidbArguments, stdout=self.subprocess.PIPE, shell=True)
         p.wait()
@@ -251,7 +251,7 @@ class Statements(object):
             theQuery = "create array %s <y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
         elif rasterArrayType == 3:
             theQuery = "create array %s <z1:int64, y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (
-            tempRastName, attribute_name)
+                tempRastName, attribute_name)
 
         try:
             self.sdb.query(theQuery)
@@ -283,7 +283,7 @@ class Statements(object):
 
         try:
             query = "load(%s, '%s' ,%s, '(int64, int64, %s)') " % (
-            tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
+                tempRastName, binaryLoadPath, sdb_instance, attributeValueTypes)
             self.sdb.query(query)
             return 1
         except:

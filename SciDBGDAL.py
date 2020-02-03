@@ -1,13 +1,30 @@
 class GDAL_functions(object):
 
     def __init__():
+        """
+        Description
+
+        Input:
+
+        Output:
+
+        """
+
         pass
 
 
 def world2Pixel(geoMatrix, x, y):
     """
     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
-    the pixel location of a geospatial 
+    the pixel location of a geospatial
+
+    Input:
+        geoMatrix =
+        x =
+        y =
+
+    Output:
+
     """
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
@@ -18,10 +35,19 @@ def world2Pixel(geoMatrix, x, y):
     
     return (pixel, line)
 
+
 def Pixel2world(geoMatrix, row, col):
     """
     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
     the x,y location of a pixel location
+
+    Input:
+        geoMatrix:
+        row:
+        col:
+
+    Output:
+
     """
 
     ulX = geoMatrix[0]
