@@ -13,8 +13,7 @@ import itertools
 
 def world2Pixel(geoMatrix, x, y):
     """
-    Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
-    the pixel location of a geospatial
+    Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate the pixel location of a geospatial
 
     Input:
         geoMatrix =
@@ -88,6 +87,20 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     2. Load the data into a 1D array
     3. Redimension and insert data into the mask array
     4. Conduct a global join using the between operators
+
+    Input:
+        sdb =
+        SciDBArray =
+        rasterValueDataType =
+        tempSciDBLoad =
+        tempRastName =
+        minY =
+        minX =
+        maxY =
+        maxX =
+        verbose =
+
+    Output:
     """
     import re
     tempArray = "mask"
@@ -145,7 +158,7 @@ def ArrayToBinary(theArray, yOffSet=0):
 
     input:
         theArray = Numpy 2D array
-        yOffSet =
+        yOffSet = Y offset to start at
 
     output:
         Numpy 2D array in binary format
@@ -173,12 +186,14 @@ def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0):
     This function write the multidimensional array as a binary
 
     Input:
-        rArray =
-        csvPath =
-        xOffset =
-        yOffset =
+        rArray = Array to write
+        csvPath = CSV path to write to
+        xOffset = X offset for starting writing
+        yOffset = Y offset for starting writing
 
     Output:
+        # TODO: examples?
+        A tuple containing the array height and width
     '''
     import numpy as np
     with open(csvPath, 'wb') as fileout:
@@ -198,11 +213,13 @@ def WriteFile(filePath, theDictionary):
     """
     This function writes out the dictionary as csv
 
+    TODO: Test if this function can be replaced by simpler pandas call, write_csv
     Input:
-        filePath =
-        theDictionary =
+        filePath = File path to write to
+        theDictionary = Dictionary to write
 
     Output:
+        None
     """
 
     thekeys = list(theDictionary.keys())
@@ -239,15 +256,15 @@ def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim
     Function Loads 1D array data into sciDB
 
     input:
-        sdb connection
-        tempSciDBLoad - path for loading scidbdata
-        tempRastName - Name for loading raster dataset
+        sdb = sdb connection
+        tempRastName = Name for loading raster dataset
+        binaryLoadPath = path for loading binary scidbdata
         rasterValeDataType - Numpy value type
         dim1 = name of the dimension (default = x) 
         dim2 = name of the dimension (default = y)
 
     output:
-        binaryLoadPath : complete path to where the file is written (*.scidb)
+        Tuple of complete path to where the file is written (*.scidb) and loadtime
     """
 
     try:
@@ -282,19 +299,19 @@ def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, te
         'right_names=x,y'), min(value), max(value), avg(value), count(value), id)
 
     Input:
-        sdb =
-        SciDBArray =
-        tempRastName =
-        rasterValueDataType =
-        tempSciDBLoad =
-        minY =
-        minX =
-        maxY =
-        maxX =
-        verbose =
+        sdb = Connection to a SciDB instance
+        SciDBArray = Names of the SciDB array to process on
+        tempRastName = Temporary raster name
+        rasterValueDataType = Type of the raster
+        tempSciDBLoad = Temporary SciDB load array
+        minY = Minimum y to process on
+        minX = Minimum X to process on
+        maxX = Maximum X to process on
+        maxY = Maximum Y to process on
+        verbose = Whether or not to use verbose version
 
     Output:
-
+        The loading time and query time in a tuple
     """
     binaryLoadPath = "%s/%s.scidb" % (tempSciDBLoad, tempRastName)
     binaryLoadPath, loadTime = LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, 'y', 'x',
@@ -318,18 +335,17 @@ def SubArray_SummaryStats(sdb, polygonSciDBArrayName, SciDBArray, minX, minY, ma
     Dimension 2 = X ulX:6187 to lrX:12662
 
     Input:
-        sdb =
-        polygonSciDBArrayName =
-        SciDBArray =
-        minY =
-        minX =
-        maxX =
-        maxY =
-        verbose =
+        sdb = Connection to a SciDB instance
+        polygonSciDBArrayName = Name of the polygon array
+        SciDBArray = SciDBArray to process
+        minY = Minimum y to process on
+        minX = Minimum X to process on
+        maxX = Maximum X to process on
+        maxY = Maximum Y to process on
+        verbose = Whether or not to use verbose version
 
     Output:
-
-
+        The time to query
     """
 
     # Raster Summary Stats
@@ -349,9 +365,11 @@ def WriteBinaryFile(params):
     This function writes a binary file
 
     Input:
-        params =
+        params = A list containing binaryPath and a tuple containing (datastore, chunk)
+        TODO: describe params args
 
     Output:
+        None
     """
 
     binaryPath = params[0]
@@ -364,12 +382,14 @@ def WriteBinaryFile(params):
 
 def ParallelProcessing(params):
     """
-    This function wraps around the ArrayToBinary and WriteBinaryFile and
+    This function wraps around the ArrayToBinary and WriteBinaryFile
 
     Input:
-        params =
+        params = A list of arguments consisting of binaryPath, yOffset, and a tuple containing (datastore, arrayChunk)
+        TODO: describe params args?
 
     Output:
+        None
     """
 
     binaryPath = params[0]
@@ -388,16 +408,17 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
     This function conducts zonal stats in SciDB
 
     Input:
-        NumberofTests =
-        boundaryPath =
-        rasterPath =
-        SciDBArray =
-        sdb =
-        statsMode =
-        filePath =
-        verbose =
+        NumberofTests = Number of tests to run
+        boundaryPath = Path to the shape file
+        rasterPath = Path to the raster file
+        SciDBArray = The array name
+        sdb = Connection to a SciDB instance
+        statsMode = Mode of analysis to conduct
+        filePath = Path to CSV file
+        verbose = Whether or not to use verbose version
 
     Output:
+        None
     """
 
     outDictionary = OrderedDict()
@@ -555,10 +576,10 @@ def CheckFiles(*argv):
     This function checks files to make sure they exist
 
     Input:
-        argv =
+        argv = Filepaths to check
 
     Output:
-
+        False if a path does not exist, True otherwise
     """
     for i in argv:
         if not os.path.exists(i):
