@@ -14,17 +14,18 @@ class RasterLoader(object):
         Initialize the class RasterReader
 
         Input:
-            RasterPath =
-            scidbArray =
-            attribute =
-            chunksize =
-            dataStorePath =
-            tiles =
-            maxPixels =
-            yOffSet =
-            overlap =
+            RasterPath = Path to the raster
+            scidbArray = Array from SciDB
+            attribute = The attribute to process
+            chunksize = The size of the chunk
+            dataStorePath = The path of the data store
+            tiles = The tiles to write over
+            maxPixels = The maximum number of pixels
+            yOffSet = The offset for y
+            overlap = The overlap of the rasters
 
         Output:
+            A RasterLoader object
         """
 
         self.width, self.height, self.datatype, self.numbands = self.GetRasterDimensions(RasterPath)
@@ -56,10 +57,10 @@ class RasterLoader(object):
         The attributeNames variable is a list of attributes
 
         Input:
-            attributeNames =
+            attributeNames = The name of the attributes to process over
 
         Output:
-
+            A tuple containing (attString, arrayType)
         """
 
         if len(attributeNames) >= 1 and self.numbands > 1:
@@ -79,7 +80,7 @@ class RasterLoader(object):
             attString = "%s:%s" % (attributeNames[0], self.datatype)
             arrayType = 1
 
-        return (attString, arrayType)
+        return attString, arrayType
 
     def GetSciDBInstances(self):
         """
@@ -99,6 +100,7 @@ class RasterLoader(object):
             rasterFilePath = Absolute Path to the GeoTiff
 
         Output:
+            None
         """
 
         for key, process, filepath, outDirectory, loadDirectory, band in zip(self.RasterMetadata.keys(),
@@ -114,9 +116,10 @@ class RasterLoader(object):
         Function gets the dimensions of the raster file
 
         Input:
-            thePath =
+            thePath = The path to the file
 
         Output:
+        A tuple containing (width, height, rasterValueDataType, numbands)
         """
         if isinstance(thePath, str):
             raster = gdal.Open(thePath, GA_ReadOnly)
@@ -148,13 +151,14 @@ class RasterLoader(object):
         Updated to handle 3D arrays.
 
         Input:
-            rasterArrayName =
-            height =
-            width =
-            chunk =
-            overlap =
+            rasterArrayName = The name of the array to create
+            height = The height of the array to create
+            width = The width of the array to create
+            chunk = The chunk to create with
+            overlap = The overlap of the array
 
         Output:
+            None
         """
 
         import scidb
@@ -186,11 +190,12 @@ class RasterLoader(object):
         Create the loading array
 
         Input:
-            tempRastName =
-            attribute_name =
-            rasterArrayType =
+            tempRastName = The names of the raster
+            attribute_name = The attribute to create on
+            rasterArrayType = The type of the raster
 
         Output:
+            None
         """
 
         import scidb
@@ -220,18 +225,19 @@ class RasterLoader(object):
         "array_shape": self.RasterArrayShape, "destination_array": scidbArray}
 
         Input:
-            theArray =
-            widthMax =
-            heightMax =
-            widthMin =
-            heightMin =
-            chunk =
-            tiles =
-            maxPixels =
-            attribute =
-            band =
+            theArray = The array to process on
+            widthMax = The maximum width
+            heightMax = The maximum height
+            widthMin = The minimum width
+            heightMin = The minimum height
+            chunk = The chunk to process on
+            tiles = The tile to process on
+            maxPixels = Maximum pixels to process on
+            attribute = Attribute to process on
+            band = The band to process on
 
         Output:
+            The raster reads
         """
         if tiles == 1:
             tiles = int(round(maxPixels / (chunk * chunk)))
@@ -272,6 +278,12 @@ class RasterLoader(object):
         The Raster Reads dictionary returns a number of reads. But SciDB Parallel load needs all instances to have
         something to load
         This function fixes that
+
+        Input:
+            None
+
+        Output:
+            The parallel dictionary
         """
 
         numOfReads = len(self.RasterReadingData)
@@ -323,15 +335,15 @@ class ZonalStats(object):
 
     def __init__(self, boundaryPath, rasterPath, SciDBArray):
         """
-        Description
+        Initialization
 
         Input:
-            boundaryPath =
-            rasterPath =
-            SciDBArray =
+            boundaryPath = Path of the boundary
+            rasterPath = Path of the raster
+            SciDBArray = SciBD array
 
         Output:
-
+            An instance of the ZonalStats class
         """
         import scidb
 
@@ -350,6 +362,7 @@ class ZonalStats(object):
             None
 
         Output:
+            None
         """
 
         query = self.sdb.queryAFL("list('instances')")
@@ -357,16 +370,16 @@ class ZonalStats(object):
 
     def SerialRasterization(self, boundaryPath, rasterPath, SciDBArray, storagePath):
         """
-        Description
+        Serial rasterization
 
         Input:
-             boundaryPath =
-             rasterPath =
-             SciDBArray =
-             storagePath =
+             boundaryPath = The path of the boundary
+             rasterPath = The path of the raster
+             SciDBArray = The array to process on
+             storagePath = The path to store the arrat
 
         Output:
-
+            None
         """
         self.tempRastName = 'p_zones'
         self.binaryPath = r'%s' % (storagePath)  # '/storage' #'/home/scidb/scidb_data/0'
@@ -379,10 +392,11 @@ class ZonalStats(object):
         The rasterization process uses the shapefile attribute ID
 
         Input:
-            inRasterPath =
-            vectorPath =
+            inRasterPath = The path of the raster
+            vectorPath = The path of the vector
 
         Output:
+            The array of the band
         """
         from osgeo import ogr, gdal
 
@@ -423,10 +437,10 @@ class ZonalStats(object):
         Description
 
         Input:
-            arrayType =
+            arrayType = The type of the array to convert
 
         Output:
-
+            The converted type
         """
         gdalTypes = {
             "uint8": 1,
@@ -474,15 +488,15 @@ class ZonalStats(object):
 
     def WriteRaster(self, inArray, outPath, noDataValue=-999):
         """
-        Description
+        Write a raster to a given path
 
         Input:
-            inArray =
-            outPath =
-            noDataValue =
+            inArray = The array to write
+            outPath = The path to write to
+            noDataValue = What to replace missing data with in the outfile
 
         Output:
-
+            None
         """
         from osgeo import ogr, gdal, gdal_array
         driver = gdal.GetDriverByName('GTiff')
@@ -503,16 +517,16 @@ class ZonalStats(object):
 
     def RasterMetadata(self, inRasterPath, vectorPath, instances, dataStorePath):
         """
-        Description
+        Get the metadata for a raster
 
         Input:
-            inRasterPath =
-            vectorPath =
-            instances =
-            dataStorePath =
+            inRasterPath = The path of the raster
+            vectorPath = The vector path
+            instances = The instances to process on
+            dataStorePath = Where to store the data
 
         Output:
-        
+            None
         """
         from osgeo import ogr, gdal
         from SciDBGDAL import world2Pixel, Pixel2world
@@ -567,10 +581,11 @@ class ZonalStats(object):
         Create an empty raster "Mask "that matches the SciDBArray
 
         Input:
-            rasterValueDataType =
-            tempArray =
+            rasterValueDataType = The data type of the array
+            tempArray = The name of the array to create
 
         Output:
+            The dimensions of the mask
         """
         import re
         tempArray = "mask"
@@ -612,12 +627,13 @@ class ZonalStats(object):
         First part inserts the boundary array into larger global mask array
 
         Input:
-            tempRastName =
-            destArray =
-            minY =
-            minX =
+            tempRastName = The name of the array to insert
+            destArray = The destination array
+            minY = The minimum Y to process on
+            minX = The minimum X to process on
 
         Output:
+            Time it takes to insert
         """
         start = timeit.default_timer()
         sdbquery = "insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format(
@@ -635,19 +651,19 @@ class ZonalStats(object):
         Joins the array and conducts the grouped_aggregate
 
         Input:
-            SciDBArray =
-            tempRastName =
-            tempArray =
-            minY =
-            minX =
-            maxY =
-            maxX =
-            thedimensions =
-            theband =
-            csvPath =
+            SciDBArray = The SciDB array to process on
+            tempRastName = The name of the temporary array
+            tempArray = The array to join on
+            minY = The minimum Y to join on
+            minX = The minimum X to join on
+            maxY = The maximum Y to join on
+            maxX = The maximum X to join on
+            thedimensions = The dimensions of the array
+            theband = The band to reclass over
+            csvPath = The CSV to write to
 
         Output:
-
+            The time it takes to run the query
         """
 
         dimName = thedimensions[0].split("=")[0]
@@ -672,23 +688,23 @@ class ZonalStats(object):
     def JoinReclass(self, SciDBArray, tempRastName, tempArray, minY, minX, maxY, maxX, thedimensions, reclassText,
                     theband=0, outcsv=None):
         """
-        Description
+        Join and save a csv
 
         Input:
-            SciDBArray =
-            tempRastName =
-            tempArray =
-            minY =
-            minX =
-            maxY =
-            maxX =
-            thedimensions =
-            reclassText =
-            theband =
-            outcsv =
+            SciDBArray = The SciDB array to process on
+            tempRastName = The name of the temporary array
+            tempArray = The array to join on
+            minY = The minimum Y to join on
+            minX = The minimum X to join on
+            maxY = The maximum Y to join on
+            maxX = The maximum X to join on
+            thedimensions = The dimensions of the array
+            reclassText = The text for reclassing
+            theband = The band to reclass over
+            outcsv = The CSV to write to
 
         Output:
-
+            None
         """
         self.InsertRedimension(tempRastName, tempArray, minY, minX)
 
@@ -713,9 +729,11 @@ def ParamSeperator(inParams):
     Description
 
     Input:
-        inParams =
+        inParams = List of parameters including x, y, height, width, pixel_1, pixel_2, projection, vectorPAth, counter,
+        offset, and dataStorePath
 
     Output:
+        The paramaters as a tuple
     """
 
     x = inParams[0]
@@ -738,9 +756,11 @@ def BigRasterization(inParams):
     Function for rasterizing in parallel
 
     Input:
-        inParams =
+        inParams = List of parameters including x, y, height, width, pixel_1, pixel_2, projection, vectorPAth, counter,
+        offset, and dataStorePath
 
     Output:
+        Tuple containing counter, offset, bandArray, binaryPartitionPath
     """
     from SciDBGDAL import world2Pixel, Pixel2world
     from osgeo import ogr, gdal
