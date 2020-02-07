@@ -1,13 +1,10 @@
 # SciDBGeo Repo
-The repo contains code for loading and analyzing geospatial (raster) data in SciDB
-
-
-### Project Structure
-
+This python repo contains code for loading and analyzing geospatial (raster) data in SciDB. The repo includes scripts to
+assist in loading raster data into a SciDB cluster, a script for zonal stats, and functions used for spatial analysis.
 
 ### Project Files
 
-1. GDALtoSciDB_multiprocessing script is a python file that will load your datasets into SciDB Clsuter using multiple SciDB instances. This is compatible with single instances
+1. GDALtoSciDB_multiprocessing script is a python file that will load your datasets into SciDB Cluster using multiple SciDB instances. This is compatible with single instances
 ```
 usage: GDALtoSciDB_multiprocessing.py [-h] -Instances
                                       [INSTANCES [INSTANCES ...]] -Host HOST
@@ -18,7 +15,6 @@ usage: GDALtoSciDB_multiprocessing.py [-h] -Instances
                                       [-SciDBLoadPath SCIDBLOADPATH]
                                       [-CSV CSV]
 ```
-multiprocessing module for loading GDAL read data into SciDB with 1 or more instances
 ```
 optional arguments:
     -h, --help              show this help message and exit
@@ -39,7 +35,7 @@ optional arguments:
     -CSV CSV                Create CSV file, which logs all of the loading times
 ```
 
-1. SciDB_ZonalStats_CL is a command line script for conducting zonal stats
+2. SciDB_ZonalStats_CL is a command line script for conducting zonal stats
 ```
 usage: SciDB_ZonalStats_CL.py [-h] -SciDBArray SCIARRAY -Raster RASTER
                                 -Shapefile SHAPEFILE [-Tests RUNS] -Mode MODE
@@ -58,8 +54,8 @@ optional arguments:
   -Host HOST                SciDB host for connection / "NoSHIM"
 ```
 
-1. SciDB_Analyis is contains the functions used for performing spatial analyses in SciDB
-Depends on 
+3. SciDB_Analyis is contains the functions used for performing spatial analyses in SciDB
+
 ```
 usage: SciDB_analysis.py 
 usage: SciDB_analysis.py [-h] [-csv CSV]

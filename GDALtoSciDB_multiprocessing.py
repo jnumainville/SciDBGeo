@@ -253,7 +253,6 @@ def GlobalRasterLoading(sdb, theMetadata, theDict):
         theDict[ str(theData[theKey]['version']) ]['redimensionTime'] = redimensionTime
 
     return theDict
-# @profile
 
 
 def GDALReader(inParams):
@@ -262,8 +261,13 @@ def GDALReader(inParams):
     Split up Loading and Redimensioning. Only Loading is multiprocessing
 
     Input:
-        inParams = An array containing the metadata, the instance, the raster path, the out path for the SciDB, the load
-        path for the SciDB, and the band index
+        inParams = An array containing the following:
+            theMetadata =
+            theInstance =
+            theRasterPath =
+            theSciDBOutPath =
+            theSciDBLoadPath =
+            bandIndex =
 
     Output:
         A tuple containing metadata, write time, and load time
@@ -438,8 +442,8 @@ def WriteFile(filePath, theDictionary):
     with open(filePath, 'w') as csvFile:
         fields = list(theDictionary[thekeys[0]].keys())
         theWriter = csv.DictWriter(csvFile, fieldnames=fields)
-        theWriter.writeheader()
 
+        theWriter.writeheader()
         for k in theDictionary.keys():
             theWriter.writerow(theDictionary[k])
 
@@ -457,7 +461,7 @@ def CreateLoadArray(sdb, tempRastName, attribute_name, rasterArrayType):
     Output:
         None
     """
-    
+
     if rasterArrayType <= 2:
         theQuery = "create array %s <y1:int64, x1:int64, %s> [xy=0:*,?,?]" % (tempRastName, attribute_name)
     elif rasterArrayType == 3:
@@ -477,8 +481,8 @@ def RedimensionAndInsertArray(sdb, tempArray, SciDBArray, RasterArrayShape, xOff
 
     Input:
         sdb = SciDB instance to redimension and insert into
-        tempArray =
-        SciDBArray = Metadata for array
+        tempArray = Temporary array to insert into
+        SciDBArray = Array data
         RasterArrayShape = Shape of the array to redimension and insert
         xOffSet = Offset in x for redimension
         yOffSet = Offset in y for redimension
@@ -534,7 +538,6 @@ def GetNumberofSciDBInstances():
     sdb = scidb.iquery()
 
     query = sdb.queryAFL("list('instances')")
-    # There is a header?
     numInstances = len(query.splitlines())-1
     numInstances = list(range(numInstances))
     return numInstances
@@ -552,7 +555,7 @@ def MultiProcessLoading(Rasters, rasterFilePath, SciDBOutPath, SciDBLoadPath):
         SciDBLoadPath = The path to load from for the SciDB instance
 
     Output:
-        Dictionary containing version, writeTime, and loadTime for metadata
+        Dictionary containing dictionaries that contain version, writeTime, and loadTime from raster metadata
     """
     SciDBInstances = GetNumberofSciDBInstances()
     pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)    
@@ -560,17 +563,18 @@ def MultiProcessLoading(Rasters, rasterFilePath, SciDBOutPath, SciDBLoadPath):
     aKey = list(Rasters.RasterMetadata.keys())[0]
     try:
         if not Rasters.RasterMetadata[aKey]['iterate']:
+            # Read in metadata from the rasters
             results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath,
                                                                             SciDBOutPath, SciDBLoadPath, 0)))
         else:
+            # Loop though the metadata reads
             for bandNum in range(1, Rasters.RasterMetadata[aKey]['iterate']+1):
-                # This works fine, check your EverNote notes for oddities. Loading Data into SciDB
                 results = pool.imap(GDALReader, (r for r in Rasters.GetMetadata(SciDBInstances, rasterFilePath,
                                                                                 SciDBOutPath, SciDBLoadPath, bandNum)))
     except:
         print(mp.get_logger())
 
-    timeDictionary = {str(i[0]):{"version": i[0], "writeTime": i[1], "loadTime": i[2] } for i in results}
+    timeDictionary = {str(i[0]): {"version": i[0], "writeTime": i[1], "loadTime": i[2]} for i in results}
     return timeDictionary
         
     pool.close()
@@ -613,12 +617,17 @@ def argument_parser():
 
 
 if __name__ == '__main__':
-    # Main running function
+    """
+        Entry point for GDALtoSciDB_multiprocessing
+        This script loads given datasets into a SciDB cluster using 1 or more SciDB instances
+    """
     args = argument_parser().parse_args()
     start = timeit.default_timer()
-    RasterInformation = RasterReader(args.rasterPath, args.arrayName, args.attributes, args.chunk, args.tiles)
-    # Debugger to see the metadata for SciDB loading.
 
+    # Read in and store raster information with given arguments
+    RasterInformation = RasterReader(args.rasterPath, args.arrayName, args.attributes, args.chunk, args.tiles)
+
+    # Load the data in parallel if requested
     timeDictionary = MultiProcessLoading(RasterInformation, args.rasterPath, args.OutPath, args.SciDBLoadPath)
     if not args.parallel:
         allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
