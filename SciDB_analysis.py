@@ -10,7 +10,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
     Each function should be completely self contained
 
     Input:
-        sdbConn =
+        sdbConn = SciDB instance to run statistics on
         datset =
         theRun =
         summaryStatsCSV
@@ -27,7 +27,6 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
     if theRun == 1:
         datapackage = ParallelRasterization(raster.arrayMetaData, raster)
         stopRasterization = timeit.default_timer()
-        SciDBInstances = raster.SciDBInstances
 
         sdb_statements = Statements(sdbConn)
 
@@ -46,7 +45,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
                                                      raster.lrY, raster.lrX, numDimensions, 1, summaryStatsCSV)
     stopSummaryStats = timeit.default_timer()
 
-    timed = OrderedDict([("connectionInfo", "XSEDE"), ("run", r), \
+    timed = OrderedDict([("connectionInfo", "XSEDE"), ("run", r),
                          ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]),
                          ("full_time", stopSummaryStats - start),
                          ("join_time", summaryStatTime), ("redimension_time", redimension_time),
@@ -62,10 +61,11 @@ def FocalAnalysis(sdbConn, arrayTable):
     This function perform a focal analysis on a SciDB Array
 
     Input:
-        sdbConn =
-        arrayTable =
+        sdbConn = Connection to a SciDB instance
+        arrayTable = Array to run analysis on
 
     Output:
+        Dictionary with timing information
     """
 
     start = timeit.default_timer()
@@ -341,5 +341,6 @@ if __name__ == '__main__':
             for i in range(SciDBInstances):
                 os.remove("/storage/%s/p_zones.scidb" % (i))
 
-    if filePath: WriteFile(filePath, timings)
+    if filePath:
+        WriteFile(filePath, timings)
     print("Finished")

@@ -1,4 +1,4 @@
-import timeit, itertools, csv, math
+import timeit, itertools, math
 import multiprocessing as mp
 import numpy as np
 from collections import OrderedDict
@@ -124,6 +124,7 @@ class RasterLoader(object):
         if isinstance(thePath, str):
             raster = gdal.Open(thePath, GA_ReadOnly)
 
+            rasterValueDataType = None
             if raster.RasterCount > 1:
                 rArray = raster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)
                 rasterValueDataType = rArray[0][0].dtype
@@ -131,7 +132,8 @@ class RasterLoader(object):
             elif raster.RasterCount == 1:
                 rasterValueDataType = raster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)[0].dtype
 
-            if rasterValueDataType == 'float32': rasterValueDataType = 'float'
+            if rasterValueDataType == 'float32':
+                rasterValueDataType = 'float'
             numbands = raster.RasterCount
             width = raster.RasterXSize
             height = raster.RasterYSize
@@ -143,7 +145,7 @@ class RasterLoader(object):
             height, width = thePath.shape
             numbands = 1
 
-        return (width, height, rasterValueDataType, numbands)
+        return width, height, rasterValueDataType, numbands
 
     def CreateDestinationArray(self, rasterArrayName, height, width, chunk, overlap):
         """
@@ -179,8 +181,8 @@ class RasterLoader(object):
         try:
             sdb.query(myQuery)
         except:
-            print("*****  Array %s already exists. Removing ****" % (rasterArrayName))
-            sdb.query("remove(%s)" % (rasterArrayName))
+            print("*****  Array %s already exists. Removing ****" % rasterArrayName)
+            sdb.query("remove(%s)" % rasterArrayName)
             sdb.query(myQuery)
 
         del sdb
@@ -211,7 +213,7 @@ class RasterLoader(object):
             sdb.query(theQuery)
         except:
             # Silently deleting temp arrays
-            sdb.query("remove(%s)" % (tempRastName))
+            sdb.query("remove(%s)" % tempRastName)
             sdb.query(theQuery)
 
     def CreateArrayMetadata(self, theArray, widthMax, heightMax, widthMin=0, heightMin=0, chunk=1000, tiles=1,
@@ -241,7 +243,8 @@ class RasterLoader(object):
         """
         if tiles == 1:
             tiles = int(round(maxPixels / (chunk * chunk)))
-            if tiles < 1: tiles = 1
+            if tiles < 1:
+                tiles = 1
 
         print("Number of tiles to be loaded %s .... %s x %s <= %s" % (tiles, chunk, chunk, maxPixels))
         RasterReads = OrderedDict()
@@ -251,14 +254,16 @@ class RasterLoader(object):
             rowsRemaining = heightMax - yOffSet
 
             # If this is not a short read, then read the correct size.
-            if rowsRemaining > chunk: rowsRemaining = chunk
+            if rowsRemaining > chunk:
+                rowsRemaining = chunk
 
             for x_version, xOffSet in enumerate(np.arange(widthMin, widthMax, chunk * tiles)):
 
                 columnsRemaining = widthMax - xOffSet  # (chunk*tiles + xOffSet)  #(x_version*chunk*tiles + x_version)
 
                 # If this is not a short read, then read the correct size.
-                if columnsRemaining > chunk * tiles: columnsRemaining = chunk * tiles
+                if columnsRemaining > chunk * tiles:
+                    columnsRemaining = chunk * tiles
 
                 RasterReads[(y_version, x_version)] = OrderedDict([("xoff", xOffSet), ("yoff", yOffSet),
                                                                    ("height", heightMax), ("width", widthMax),
@@ -382,7 +387,7 @@ class ZonalStats(object):
             None
         """
         self.tempRastName = 'p_zones'
-        self.binaryPath = r'%s' % (storagePath)  # '/storage' #'/home/scidb/scidb_data/0'
+        self.binaryPath = r'%s' % storagePath  # '/storage' #'/home/scidb/scidb_data/0'
         self.RasterArray = self.RasterizePolygon(rasterPath, boundaryPath)
 
     def RasterizePolygon(self, inRasterPath, vectorPath):
@@ -551,15 +556,15 @@ class ZonalStats(object):
         self.VectorWidth = abs(self.width)
 
         step = int(abs(self.tlY - self.lrY) / instances)
-        print("Each partition array dimensionsa are approximately %s lines, %s columns = %s pixels" % (step, self.width,
-                                                                                                       step * self.width))
+        print("Each partition array dimensionsa are approximately %s lines, %s columns = %s pixels" %
+              (step, self.width, step * self.width))
         self.arrayMetaData = []
 
         top = self.tlY
         for i in range(instances):
             if top + step <= self.lrY and i < instances - 1:
                 topPixel = top
-                print("top pixel: %s" % (topPixel))
+                print("top pixel: %s" % topPixel)
                 self.height = step
             elif top + step <= self.lrY and i == instances - 1:
                 topPixel = top
@@ -590,7 +595,7 @@ class ZonalStats(object):
         import re
         tempArray = "mask"
 
-        results = self.sdb.queryAFL("show(%s)" % (self.SciDBArrayName))
+        results = self.sdb.queryAFL("show(%s)" % self.SciDBArrayName)
         results = results.decode("utf-8")
 
         R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>[^\]]+)')
@@ -681,7 +686,7 @@ class ZonalStats(object):
         stop = timeit.default_timer()
         queryTime = stop - start
         if csvPath:
-            self.sdb.queryResults(sdbquery, r"%s" % (csvPath))
+            self.sdb.queryResults(sdbquery, r"%s" % csvPath)
 
         return queryTime
 
@@ -891,7 +896,7 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
         arraydatatypes = []
         for datastore, offset, array, resultPath in arrayData:
             arraydatatypes.append(array.dtype)
-        return (arraydatatypes)
+        return arraydatatypes
 
 
 def RemoveArrayVersions(sdb, theArrayName):
@@ -970,10 +975,10 @@ def ParallelLoadByChunk(rasterReadingData):
             RemoveArrayVersions(sdb, nodeLoopIteration[0][1]["destination_array"])
 
             stop = timeit.default_timer()
-            if l == 0: print("Estimated time for loading the dataset in minutes %s: LoadTime: %s seconds, "
-                             "RedimensionTime: %s seconds" % (
-                                 (stop - start) * loadLoops / 60, startRedimension - startLoad,
-                                 stop - startRedimension))
+            if l == 0:
+                print("Estimated time for loading the dataset in minutes %s: LoadTime: %s seconds, RedimensionTime: "
+                      "%s seconds" % ((stop - start) * loadLoops / 60, startRedimension - startLoad, stop -
+                                      startRedimension))
 
     except:
 
@@ -1029,10 +1034,10 @@ def ParallelLoad(rasterReadingMetadata):
             RemoveArrayVersions(sdb, rasterReadingMetadata[1]["destination_array"])
 
             stop = timeit.default_timer()
-            if l == 0: print("Estimated time for loading the dataset in minutes %s: WriteTime: %s seconds, "
-                             "LoadTime: %s seconds, RedimensionTime: %s seconds" %
-                             ((stop - start) * loadLoops / 60, startLoad - start, startRedimension - startLoad,
-                              stop - startRedimension))
+            if l == 0:
+                print("Estimated time for loading the dataset in minutes %s: WriteTime: %s seconds, LoadTime: %s "
+                      "seconds, RedimensionTime: %s seconds" % ((stop - start) * loadLoops / 60, startLoad - start,
+                                                                startRedimension - startLoad, stop - startRedimension))
 
     except Exception as e:
         print(e)
@@ -1090,7 +1095,7 @@ def Read_Write_Raster(rDict):
 
     binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict[1]["datastore"], rDict[1]["node"])
     if os.path.exists(binaryPartitionPath):
-        print("****Removing file****  %s" % (binaryPartitionPath))
+        print("****Removing file****  %s" % binaryPartitionPath)
         os.remove(binaryPartitionPath)
 
     rArray = raster.ReadAsArray(xoff=int(rDict[1]["xoff"]), yoff=int(rDict[1]["yoff"]), xsize=int(rDict[1]["xsize"]),

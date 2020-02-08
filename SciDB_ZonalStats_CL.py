@@ -29,7 +29,7 @@ def world2Pixel(geoMatrix, x, y):
     pixel = int((x - ulX) / xDist)
     line = int((ulY - y) / xDist)
 
-    return (abs(pixel), abs(line))
+    return abs(pixel), abs(line)
 
 
 def RasterizePolygon(inRasterPath, outRasterPath, vectorPath):
@@ -105,7 +105,7 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     import re
     tempArray = "mask"
 
-    results = sdb.queryAFL("show(%s)" % (SciDBArray))
+    results = sdb.queryAFL("show(%s)" % SciDBArray)
     results = results.decode("utf-8")
 
     R = re.compile(r'\<(?P<attributes>[\S\s]*?)\>(\s*)\[(?P<dim_1>\S+)(;\s|,\s)(?P<dim_2>[^\]]+)')
@@ -114,12 +114,12 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
 
     try:
         A = match.groupdict()
-        schema = A['attributes']
         dimensions = "[%s; %s]" % (A['dim_1'], A['dim_2'])
     except:
         print(results)
         raise
 
+    sdbquery = None
     try:
         sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
         sdb.query(sdbquery)
@@ -175,14 +175,14 @@ def ArrayToBinary(theArray, yOffSet=0):
     values = theArray.ravel()
     vdatatype = theArray.dtype
 
-    arraydatatypes = 'int64, int64, %s' % (vdatatype)
+    arraydatatypes = 'int64, int64, %s' % vdatatype
     dataset = np.core.records.fromarrays([column_index, row_index, values], names='y,x,value', dtype=arraydatatypes)
 
     return dataset
 
 
 def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0):
-    '''
+    """
     This function write the multidimensional array as a binary
 
     Input:
@@ -194,7 +194,7 @@ def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0):
     Output:
         # TODO: examples?
         A tuple containing the array height and width
-    '''
+    """
     import numpy as np
     with open(csvPath, 'wb') as fileout:
         arrayHeight, arrayWidth = rArray.shape
@@ -272,7 +272,7 @@ def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim
                                                                                  rasterValueDataType)
         sdb.query(sdbquery)
     except:
-        sdb.query("remove(%s)" % (tempRastName))
+        sdb.query("remove(%s)" % tempRastName)
         sdbquery = "create array %s <%s:int64, %s:int64, id:%s> [xy=0:*,?,?]" % (tempRastName, dim1, dim2,
                                                                                  rasterValueDataType)
         sdb.query(sdbquery)
@@ -449,9 +449,11 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             print("Dimension 2 = X ulX:%s to lrX:%s " % (ulX, lrX))
             print("Number of pixels: %s" % (format(rasterizedArray.shape[0] * rasterizedArray.shape[1], ',d')))
 
+        queryTime = None
+        transferTime = None
         if statsMode == 1:
             # Transfering Raster Array to SciDB
-
+            polygonSciDBArray = None
             chunksize = int(input("Please input chunksize: "))
             if isinstance(chunksize, int):
                 start = timeit.default_timer()
@@ -495,7 +497,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
             print("Writing Binary File")
             start = timeit.default_timer()
-            binaryLoadPath = "%s/s_zones.scidb" % (binaryPath)
+            binaryLoadPath = "%s/s_zones.scidb" % binaryPath
             with open(binaryLoadPath, 'wb') as fileout:
                 fileout.write(binaryArray.ravel().tobytes())
                 print(binaryLoadPath)
@@ -560,7 +562,8 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
                                                               ulY, ulX, lrY, lrX, verbose)
 
         print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t + 1))
-        if verbose: print("Redimension Time: %s" % (transferTime))
+        if verbose:
+            print("Redimension Time: %s" % transferTime)
         outDictionary[theTest] = OrderedDict([("test", theTest), ("SciDBArrayName", SciDBArray),
                                               ("BoundaryFilePath", boundaryPath), ("transfer_time", transferTime),
                                               ("rasterization_time", rasterizeTime), ("query_time", queryTime),
@@ -583,7 +586,7 @@ def CheckFiles(*argv):
     """
     for i in argv:
         if not os.path.exists(i):
-            print("FilePath %s does not exist" % (i))
+            print("FilePath %s does not exist" % i)
             return False
     return True
 
