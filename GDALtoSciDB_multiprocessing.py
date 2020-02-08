@@ -39,7 +39,8 @@ class RasterReader(object):
             attributeNames = Name of the attribute(s) for the destination array
 
         Output:
-            A tuple containing the attribute string and type of array
+            A tuple in the following format:
+                (attribute string, type of array)
         """
         if len(attributeNames) >= 1 and self.numbands > 1:
             # Each pixel value will be a new attribute
@@ -72,8 +73,9 @@ class RasterReader(object):
             band = The band number to get the data from
 
         Output:
-            A tuple containing self.RasterMetadata[key], process, filepath, outDirectory, loadDirectory, band, various
-            data needed for processing
+            Yield a tuple in the following format:
+                (raster metadata for a specific key, running process, filepath to raster, dictionary out, dictionary for
+                 loading, band)
         """
 
         for key, process, filepath, outDirectory, loadDirectory, band in zip(self.RasterMetadata.keys(),
@@ -92,7 +94,8 @@ class RasterReader(object):
             thePath = Input file path for the raster
 
         Output:
-            A tuple containing the width, height, data type, and number of bands
+            A tuple in the following format:
+             (width of the raster, height of the raster, data type of the raster, number of bands of the raster)
         """
         raster = gdal.Open(thePath, GA_ReadOnly)
 
@@ -264,16 +267,17 @@ def GDALReader(inParams):
     Split up Loading and Redimensioning. Only Loading is multiprocessing
 
     Input:
-        inParams = An array containing the following:
+        inParams = A tuple or list containing the following:
             theMetadata = Metadata for the reading
             theInstance = Instance to read from
             theRasterPath = Path to the raster to read
             theSciDBOutPath = Out path for SciDB processing
             theSciDBLoadPath = Load path for SciDB processing
-            bandIndex = Indes of the band to process on
+            bandIndex = Index of the band to process on
 
     Output:
-        A tuple containing metadata, write time, and load time
+        A tuple in the following format:
+            (metadata for the raster, write time for the raster, load time for the raster)
     """
     theMetadata = inParams[0]
     theInstance = inParams[1]
@@ -358,7 +362,7 @@ def ArrayDimension(anyArray):
         anyArray = The input array to measure
 
     Output:
-        The number of rows and columns
+        The shape of the array
     """
     if anyArray.ndim == 2:
         return anyArray.shape
@@ -404,7 +408,6 @@ def WriteArray(theArray, binaryFilePath, arrayType, attributeName='value', bandI
         elif arrayType == 2:
             # Raster has multiple attributes, but it is 2D
             # Making a list of attribute names with data types
-            # numbands > 1 and attributeName.find(",") == -1:
 
             attributesList = [('x', 'int64'), ('y', 'int64')]
             for dim, name in enumerate(attributeName.split(",")):
@@ -560,7 +563,11 @@ def MultiProcessLoading(Rasters, rasterFilePath, SciDBOutPath, SciDBLoadPath):
         SciDBLoadPath = The path to load from for the SciDB instance
 
     Output:
-        Dictionary containing dictionaries that contain version, writeTime, and loadTime from raster metadata
+        Dictionary containing the following:
+            Dictionaries containing the following keys:
+                version = version from raster
+                writeTime = write time from raster metadata
+                loadTime = load time from raster metadata
     """
     SciDBInstances = GetNumberofSciDBInstances()
     pool = mp.Pool(len(SciDBInstances), maxtasksperchild=1)

@@ -22,10 +22,10 @@ class iquery(object):
         Run a query, returning the results
 
         Input:
-        theQuery = The desired query to run
+            theQuery = The desired query to run
 
         Output:
-        The result of the query
+            The result of the query
         """
         scidbArguments = """iquery -anq "%s";""" % theQuery
         print(scidbArguments)
@@ -94,7 +94,7 @@ class iquery(object):
             theCSVPath = The path to write the CSV results to
 
         Output:
-            theCSVPath
+            theCSVPath, as originally given
         """
 
         # Open up subprocess for query

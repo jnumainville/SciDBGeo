@@ -19,7 +19,8 @@ def world2Pixel(geoMatrix, x, y):
         y = The y dimension to use
 
     Output:
-        A tuple containing pixel, line from x and y, respectfully
+        A tuple in the following format:
+            (pixel from x dimensions, line from y dimensions)
     """
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
@@ -41,7 +42,8 @@ def Pixel2world(geoMatrix, row, col):
         y = The y dimension to use
 
     Output:
-        A tuple containing x_coord, y_coord
+        A tuple in the following format:
+            (x coordinate, y coordinate)
     """
 
     ulX = geoMatrix[0]

@@ -38,6 +38,7 @@ class RasterLoader(object):
         self.rasterPath = RasterPath
         hdataset = np.arange(self.height)
 
+        # Build the metadata and reading data from parameters
         self.RasterMetadata = {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange), "height":
             len(heightRange), "width": self.width, "datastore": self.dataStorePath, "filepath": self.rasterPath,
                                       "attribute": self.AttributeString, "array_shape": self.RasterArrayShape,
@@ -60,17 +61,16 @@ class RasterLoader(object):
             attributeNames = The name of the attributes to process over
 
         Output:
-            A tuple containing (attString, arrayType)
+            A tuple in the following format:
+                (attribute string, array type)
         """
 
         if len(attributeNames) >= 1 and self.numbands > 1:
             # Each pixel value will be a new attribute
             attributes = ["%s:%s" % (i, self.datatype) for i in attributeNames]
             if len(attributeNames) == 1:
-
                 attString = " ".join(attributes)
                 arrayType = 3
-
             else:
                 attString = ", ".join(attributes)
                 arrayType = 2
@@ -84,7 +84,13 @@ class RasterLoader(object):
 
     def GetSciDBInstances(self):
         """
+        Setup the SciDB instances for the class
 
+        Input:
+            None
+
+        Output:
+            None
         """
         from scidb import iquery
         sdb = iquery()
@@ -93,14 +99,16 @@ class RasterLoader(object):
 
     def GetMetadata(self, scidbInstances, rasterFilePath, outPath, loadPath, band):
         """
-        Generator for the class
+        Generator for the class, iteratively yielding
 
         Input: 
             scidbInstance = SciDB Instance IDs
             rasterFilePath = Absolute Path to the GeoTiff
 
         Output:
-            None
+            Yield a tuple in the following format:
+                (raster metadata for a specific key, running process, filepath to raster, dictionary out, dictionary for
+                 loading, band)
         """
 
         for key, process, filepath, outDirectory, loadDirectory, band in zip(self.RasterMetadata.keys(),
@@ -119,11 +127,12 @@ class RasterLoader(object):
             thePath = The path to the file
 
         Output:
-        A tuple containing (width, height, rasterValueDataType, numbands)
+            A tuple in the following format:
+                (width of the raster, height of the raster, date type of the raster, number of bands in the raster)
         """
         if isinstance(thePath, str):
             raster = gdal.Open(thePath, GA_ReadOnly)
-
+            # Extract the data type
             rasterValueDataType = None
             if raster.RasterCount > 1:
                 rArray = raster.ReadAsArray(xoff=0, yoff=0, xsize=1, ysize=1)
@@ -172,6 +181,7 @@ class RasterLoader(object):
                                                                              chunk,
                                                                              overlap)
         else:
+            # Add in bands to the query
             myQuery = "create array %s <%s> [band=0:%s,1,%s; y=0:%s,%s,0; x=0:%s,%s,%s]" % (rasterArrayName,
                                                                                             self.AttributeString,
                                                                                             self.numbands - 1,
@@ -181,6 +191,7 @@ class RasterLoader(object):
         try:
             sdb.query(myQuery)
         except:
+            # Remove the array if it already exists then rerun the query
             print("*****  Array %s already exists. Removing ****" % rasterArrayName)
             sdb.query("remove(%s)" % rasterArrayName)
             sdb.query(myQuery)
@@ -259,7 +270,7 @@ class RasterLoader(object):
 
             for x_version, xOffSet in enumerate(np.arange(widthMin, widthMax, chunk * tiles)):
 
-                columnsRemaining = widthMax - xOffSet  # (chunk*tiles + xOffSet)  #(x_version*chunk*tiles + x_version)
+                columnsRemaining = widthMax - xOffSet
 
                 # If this is not a short read, then read the correct size.
                 if columnsRemaining > chunk * tiles:
@@ -288,7 +299,18 @@ class RasterLoader(object):
             None
 
         Output:
-            The parallel dictionary
+            The parallel dictionary, an ordered dictionary with the (row, column) tuple as a key, which itself has a
+            value of an ordered dictonary with the following keys:
+                xoff = x offset for reads
+                yoff = y offset for reads
+                width = width for reads
+                xsize = size of x for reads
+                array_shape = shape of array for reads
+                attribute = attribute for reads
+                destination_array = destination_array for reads
+                chunk = chunk for reads
+                datastore = datastore for reads
+                filepath = filepath for reads
         """
 
         numOfReads = len(self.RasterReadingData)
@@ -560,6 +582,7 @@ class ZonalStats(object):
               (step, self.width, step * self.width))
         self.arrayMetaData = []
 
+        # Set the top pixel, then use it to add to the metadata
         top = self.tlY
         for i in range(instances):
             if top + step <= self.lrY and i < instances - 1:
