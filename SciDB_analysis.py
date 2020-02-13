@@ -11,11 +11,12 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
 
     Input:
         sdbConn = SciDB instance to run statistics on
-        datset =
-        theRun =
-        summaryStatsCSV
+        datset = The dataset to run the statistics on
+        theRun = The run the program is currently on
+        summaryStatsCSV = The CSV path to write to
 
     Output:
+        An ordered dictionary with the following keys:
     """
 
     start = timeit.default_timer()

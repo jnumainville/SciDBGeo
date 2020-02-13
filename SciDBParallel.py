@@ -484,7 +484,6 @@ class ZonalStats(object):
 
         return gdalTypes[arrayType]
 
-    # TODO: Determine if necessary
     def SciDBDataTypes(self):
         """
         List of all SciDB Data Types
@@ -705,6 +704,7 @@ class ZonalStats(object):
                        "min(value), max(value), avg(value), count(value), id)" \
                        % (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX)
 
+        # Time the query, writing if able
         self.sdb.query(sdbquery)
         stop = timeit.default_timer()
         queryTime = stop - start
@@ -746,6 +746,7 @@ class ZonalStats(object):
             sdbquery = "apply(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), newvalue, %s)" % \
                        (SciDBArray, minY, minX, maxY, maxX, tempArray, minY, minX, maxY, maxX, reclassText)
 
+        # Save the CSV
         if outcsv:
             self.sdb.query("save(sort(%s,y,y,x,x),y,x),'%s', 0, 'csv') " % (sdbquery[:-1], outcsv))
         else:
@@ -754,14 +755,25 @@ class ZonalStats(object):
 
 def ParamSeperator(inParams):
     """
-    Description
+    Seperate paramaters into a tuple
 
     Input:
-        inParams = List of parameters including x, y, height, width, pixel_1, pixel_2, projection, vectorPAth, counter,
-        offset, and dataStorePath
+        inParams = List of parameters including the following, in order:
+            x = x dimension
+            y = y dimension
+            height = Height of the raster
+            width = Width of the raster
+            pixel_1 = Pixel size
+            pixel_2 = Result from raster transform
+            projection = Projection of the raster
+            vectorPath = Path of the vector
+            counter = Current counter
+            offset = Offset to start at
+            dataStorePath = Where to store the data
 
     Output:
-        The paramaters as a tuple
+        The parameters as a tuple:
+            (x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter, offset, dataStorePath)
     """
 
     x = inParams[0]
@@ -865,10 +877,10 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0, xO
 
     input:
         theArray = Numpy 2D array
-        binaryFilePath =
-        attributeName =
-        yOffset =
-        xOffset =
+        binaryFilePath = File to write to
+        attributeName = Name of the attribute to use
+        yOffset = Offset for the y dimension
+        xOffset = Offset for the x dimension
     output:
         Numpy 2D array in binary format
     """
@@ -896,18 +908,19 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0, xO
 
 def ParallelRasterization(coordinateData, theRasterClass=None):
     """
-    Description
+    Rasterize data in parallel
 
     Input:
-        coordinateData =
-        theRasterClass =
+        coordinateData = Data to use for rasterization
+        theRasterClass = Raster class to utilize
 
     Output:
-
+        Data types of the array on success
     """
 
     pool = mp.Pool(len(coordinateData))
 
+    # Attempt to run the rasterization
     try:
         arrayData = pool.imap(BigRasterization, (c for c in coordinateData))
         pool.close()
@@ -924,14 +937,14 @@ def ParallelRasterization(coordinateData, theRasterClass=None):
 
 def RemoveArrayVersions(sdb, theArrayName):
     """
-    Description
+    Remove array versions from the database
 
     Input:
-        sdb =
-        theArrayName =
+        sdb = The connection to the SciDB array
+        theArrayName = Name of the array to remove from
 
     Output:
-
+        None
     """
 
     versions = sdb.versions(theArrayName)
@@ -949,10 +962,10 @@ def ParallelLoadByChunk(rasterReadingData):
     This function will do parallel loading that supports fast redimensioning
 
     Input:
-        rasterReadingData =
+        rasterReadingData = The raster data
 
     Output:
-
+        None
     """
 
     from scidb import iquery, Statements
@@ -965,6 +978,7 @@ def ParallelLoadByChunk(rasterReadingData):
     query = sdb.queryAFL("list('instances')")
     scidbInstances = len(query.splitlines()) - 1
 
+    # Cycle through the instances with the given data
     for r, node in zip(rasterReadingData, cycle(range(scidbInstances))):
         rasterReadingData[r]["node"] = node
 
@@ -979,7 +993,7 @@ def ParallelLoadByChunk(rasterReadingData):
     try:
         start = timeit.default_timer()
         for l, nodeLoopIteration in enumerate(np.array_split(list(rasterReadingData.items()), loadLoops)):
-
+            # Create load arrsy
             pool = mp.Pool(scidbInstances)
             print("Loading %s of %s" % (l, loadLoops - 1))
             sdb_statements.CreateLoadArray("LoadArray", loadAttribute, int(nodeLoopIteration[0][1]['array_shape']))
@@ -987,6 +1001,7 @@ def ParallelLoadByChunk(rasterReadingData):
             pool.close()
             pool.join()
 
+            # Load the one dimension array and insert redimension
             startLoad = timeit.default_timer()
             sdb_statements.LoadOneDimensionalArray(-1, "LoadArray", loadAttribute, 1, 'pdataset.scidb')
 
@@ -1004,7 +1019,6 @@ def ParallelLoadByChunk(rasterReadingData):
                                       startRedimension))
 
     except:
-
         print("Something went wrong")
 
 
@@ -1019,9 +1033,10 @@ def ParallelLoad(rasterReadingMetadata):
     Make sure to consider the number of SciDB processes when setting maxPixel 
 
     Input:
-        rasterReadingMetadata =
+        rasterReadingMetadata = The raster data
 
     Output:
+        None
     """
     from scidb import iquery, Statements
     import timeit
@@ -1038,14 +1053,16 @@ def ParallelLoad(rasterReadingMetadata):
 
         start = timeit.default_timer()
         for l, nodeLoopIteration in enumerate(np.array_split(list(nodeLoopData.items()), loadLoops)):
-            # Have to iniate the pool for each loop
+            # Have to initiate the pool for each loop
             pool = mp.Pool(numProcesses)
             print("Loading %s of %s" % (l + 1, loadLoops))
+            # Create the load array
             sdb_statements.CreateLoadArray("LoadArray", loadAttribute, rasterReadingMetadata[0]['array_shape'])
             pool.imap(Read_Write_Raster, (n for n in nodeLoopIteration))
             pool.close()
             pool.join()
 
+            # Load the one dimension array and insert redimension
             startLoad = timeit.default_timer()
             sdb_statements.LoadOneDimensionalArray(-1, "LoadArray", loadAttribute, 1, 'pdataset.scidb')
 
@@ -1073,10 +1090,11 @@ def AdjustMetaData(loops, theRMD):
     This function returns the adjust load dimensions for each iteration
 
     Input:
-        loops =
-        theRMD =
+        loops = The number of subarrays to run through
+        theRMD = The raster metadata
 
     Output:
+        A dictionary with the adjusted metadata containing the following keys:
     """
     adjustedData = {(l, r): {"node": theRMD[r]["node"], "y_min": theRMD[r]["y_min"], "y_max": theRMD[r]["y_max"],
                              "height": theRMD[r]["height"], "width": theRMD[r]["width"],
@@ -1096,15 +1114,20 @@ def AdjustMetaData(loops, theRMD):
 
 def Read_Write_Raster(rDict):
     """
-    This function takes as input an OrderedDict which contains the following keys:
-        node, ysize, xsize, yoff, xoff, datastore, filepath
-
-    rDict is an ordered Dictionary (key, {key, value} )
+    This function takes as input an OrderedDict, which is uses for reading and writing
 
     Input:
-        rDict =
+        rDict = An ordered Dictionary (key, {key, value} ) with the following keys:
+            node = The node to use
+            ysize = The size of the y dimension
+            xsize = The size of the x dimension
+            yoff = Offsey for y
+            xoff = Offset for x
+            datastore = Where the data is stored
+            filepath = Path to the file to
 
     Output:
+        None
     """
 
     import os
@@ -1118,6 +1141,7 @@ def Read_Write_Raster(rDict):
 
     binaryPartitionPath = r"%s/%s/pdataset.scidb" % (rDict[1]["datastore"], rDict[1]["node"])
     if os.path.exists(binaryPartitionPath):
+        # If the file already exists, remove it
         print("****Removing file****  %s" % binaryPartitionPath)
         os.remove(binaryPartitionPath)
 
@@ -1134,17 +1158,19 @@ def ArraySplicerLogic(width, height, maxPixels=20000000):
     maxPixels should be determined based on memory constraints of your machine
 
     Input:
-        width =
-        height =
-        maxPixels =
+        width = The width of the array
+        height = The height of the array
+        maxPixels = The maximum number of pixels per loop
 
     Output:
+        The number of iterations
     """
     if height * width < maxPixels:
         return 1
     elif width > maxPixels:
         return height
     else:
+        # Split the array
         possibles = OrderedDict([(h, h * width) for h in range(height)])
         solutions = {k: v for k, v in possibles.items() if v <= maxPixels and k > 0}
         numIterations = height / max({k: v for k, v in solutions.items()})
