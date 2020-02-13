@@ -16,11 +16,13 @@ def world2Pixel(geoMatrix, x, y):
     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate the pixel location of a geospatial
 
     Input:
-        geoMatrix =
-        x =
-        y =
+        geoMatrix = The matrix to use for the calculation
+        x = The x dimension to use
+        y = The y dimension to use
 
     Output:
+        A tuple in the following format:
+            (pixel value, line value)
     """
     ulX = geoMatrix[0]
     ulY = geoMatrix[3]
@@ -39,11 +41,12 @@ def RasterizePolygon(inRasterPath, outRasterPath, vectorPath):
     The rasterization process uses the shapfile attribute ID
 
     Input:
-        inRasterPath =
-        outRasterPath =
-        vectorPath =
+        inRasterPath = The path where the raster is
+        outRasterPath = Where to write the raster (not currently used)
+        vectorPath = The path to the vector dataset
 
     Output:
+        The band array
     """
 
     # The array size, sets the raster size
@@ -56,6 +59,7 @@ def RasterizePolygon(inRasterPath, outRasterPath, vectorPath):
     theLayer = vector_dataset.GetLayer()
     geomMin_X, geomMax_X, geomMin_Y, geomMax_Y = theLayer.GetExtent()
 
+    # Transform the polygon
     outTransform = [geomMin_X, rasterTransform[1], 0, geomMax_Y, 0, rasterTransform[5]]
 
     rasterWidth = int((geomMax_X - geomMin_X) / pixel_size)
@@ -89,22 +93,25 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     4. Conduct a global join using the between operators
 
     Input:
-        sdb =
-        SciDBArray =
-        rasterValueDataType =
-        tempSciDBLoad =
-        tempRastName =
-        minY =
-        minX =
-        maxY =
-        maxX =
-        verbose =
+        sdb = The SciDB connection to use
+        SciDBArray = The sciDB array to use
+        rasterValueDataType = The data type of the raster value
+        tempSciDBLoad = Temporary SciDB loading array
+        tempRastName = Name of the remporary array
+        minY = Minimum y dimension
+        minX = Minimum x dimension
+        maxY = Maximum y dimension
+        maxX = Maximum x dimension
+        verbose = True to print times, false otherwise
 
     Output:
+        A tuple in the following format:
+            (insertion time, query time)
     """
     import re
     tempArray = "mask"
 
+    # Show array, search through it
     results = sdb.queryAFL("show(%s)" % SciDBArray)
     results = results.decode("utf-8")
 
@@ -119,6 +126,7 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
         print(results)
         raise
 
+    # Create the array, removing on failure
     sdbquery = None
     try:
         sdbquery = r"create array %s <id:%s> %s" % (tempArray, rasterValueDataType, dimensions)
@@ -136,7 +144,8 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     insertTime = stop - start
-    if verbose: print(sdbquery, insertTime)
+    if verbose:
+        print(sdbquery, insertTime)
 
     start = timeit.default_timer()
     sdbquery = "grouped_aggregate(join(between(%s, %s, %s, %s, %s), between(%s, %s, %s, %s, %s)), min(value), " \
@@ -145,7 +154,8 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     queryTime = stop - start
-    if verbose: print(sdbquery, queryTime)
+    if verbose:
+        print(sdbquery, queryTime)
     sdb.query("remove(%s)" % tempArray)
     sdb.query("remove(%s)" % tempRastName)
 
@@ -192,7 +202,6 @@ def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0):
         yOffset = Y offset for starting writing
 
     Output:
-        # TODO: examples?
         A tuple containing the array height and width
     """
     import numpy as np
@@ -200,6 +209,7 @@ def WriteMultiDimensionalArray(rArray, csvPath, xOffset=0, yOffset=0):
         arrayHeight, arrayWidth = rArray.shape
         it = np.nditer(rArray, flags=['multi_index'], op_flags=['readonly'])
         for counter, pixel in enumerate(it):
+            # Write the chunk to the csvPath
             col, row = it.multi_index
             indexvalue = np.array([col + yOffset, row + xOffset], dtype=np.dtype('int64'))
 
@@ -213,7 +223,6 @@ def WriteFile(filePath, theDictionary):
     """
     This function writes out the dictionary as csv
 
-    TODO: Test if this function can be replaced by simpler pandas call, write_csv
     Input:
         filePath = File path to write to
         theDictionary = Dictionary to write
@@ -234,22 +243,6 @@ def WriteFile(filePath, theDictionary):
             theWriter.writerow(theDictionary[k])
 
 
-def QueryResults():
-    """
-    Function to perform the Zonal Analysis can get back the results
-
-    Input:
-        None
-
-    Output:
-        None
-    """
-
-    afl = sdb.afl
-    result = afl.grouped_aggregate(afl.join(polygonSciDBArray.name, afl.subarray(SciDBArray, ulY, ulX, lrY, lrX)),
-                                   max("value"), "f0")
-
-
 def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim1="y", dim2="x", verbose=False,
                      loadMode=-2):
     """
@@ -264,9 +257,11 @@ def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim
         dim2 = name of the dimension (default = y)
 
     output:
-        Tuple of complete path to where the file is written (*.scidb) and loadtime
+        Tuple of complete path to where the file is written
+            (path *.scidb, load time)
     """
 
+    # Create the array, removing it if already exists
     try:
         sdbquery = "create array %s <%s:int64, %s:int64, id:%s> [xy=0:*,?,?]" % (tempRastName, dim1, dim2,
                                                                                  rasterValueDataType)
@@ -279,12 +274,14 @@ def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim
 
     start = timeit.default_timer()
 
+    # Run the load
     sdbquery = "load(%s,'%s', %s, '(int64, int64, %s)' )" % (tempRastName, binaryLoadPath, loadMode,
                                                              rasterValueDataType)
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     loadTime = stop - start
-    if verbose: print(sdbquery, loadTime)
+    if verbose:
+        print(sdbquery, loadTime)
 
     return binaryLoadPath, loadTime
 
@@ -352,7 +349,8 @@ def SubArray_SummaryStats(sdb, polygonSciDBArrayName, SciDBArray, minX, minY, ma
     query = "grouped_aggregate(join(%s,subarray(%s, %s, %s, %s, %s)), min(value), max(value), avg(value), " \
             "count(value), f0)" % (polygonSciDBArrayName, SciDBArray, minY, minX, maxY, maxX)
     start = timeit.default_timer()
-    if verbose: print(query)
+    if verbose:
+        print(query)
     results = sdb.query(query)
     stop = timeit.default_timer()
     queryTime = stop - start
@@ -365,8 +363,9 @@ def WriteBinaryFile(params):
     This function writes a binary file
 
     Input:
-        params = A list containing binaryPath and a tuple containing (datastore, chunk)
-        TODO: describe params args
+        params = A list containing the following, in order:
+            binaryPath = Path to write to
+            datastore, chunk = where the data is stored, the chunk to write
 
     Output:
         None
@@ -385,8 +384,10 @@ def ParallelProcessing(params):
     This function wraps around the ArrayToBinary and WriteBinaryFile
 
     Input:
-        params = A list of arguments consisting of binaryPath, yOffset, and a tuple containing (datastore, arrayChunk)
-        TODO: describe params args?
+        params = A list containing the following, in order:
+            binaryPath = The path to write to
+            yOffSet = The offset for the y dimension
+            datastore, arrayChunk = Where the data is stored, the chunk to write
 
     Output:
         None
@@ -432,7 +433,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
         inRaster = gdal.Open(rasterPath)
         rasterTransform = inRaster.GetGeoTransform()
-
+        # Check the time for rasterization
         start = timeit.default_timer()
         rasterizedArray = RasterizePolygon(rasterPath, r'/home/scidb/scidb_data/0/0/nothing.tiff', boundaryPath)
         rasterValueDataType = rasterizedArray.dtype
@@ -465,6 +466,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             queryTime = SubArray_SummaryStats(sdb, polygonSciDBArray.name, SciDBArray, ulX, ulY, lrX, lrY, verbose)
 
         elif statsMode == 2:
+            # Use EquiJoin summary stats
             csvPath = '/home/scidb/scidb_data/0/0/polygon.scidb'
             WriteMultiDimensionalArray(rasterizedArray, csvPath, ulX, ulY)
             tempRastName = csvPath.split('/')[-1].split('.')[0]
@@ -473,6 +475,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
                                                             tempSciDBLoad, ulY, ulX, lrY, lrX, verbose)
 
         elif statsMode == 3:
+            # Use GlobalJoin summary stats
             csvPath = '/home/scidb/scidb_data/0/0/zones.scidb'
             WriteMultiDimensionalArray(rasterizedArray, csvPath)
             tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
@@ -618,6 +621,10 @@ def argument_parser():
 
 
 if __name__ == '__main__':
+    """
+        Entry point for SciDB_ZonalStats_CL
+        This is a command line script for conducting zonal stats    
+    """
     args = argument_parser().parse_args()
     if CheckFiles(args.Shapefile, args.Raster):
         if args.host == "NoSHIM":

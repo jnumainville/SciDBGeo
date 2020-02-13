@@ -1094,7 +1094,7 @@ def AdjustMetaData(loops, theRMD):
         theRMD = The raster metadata
 
     Output:
-        A dictionary with the adjusted metadata containing the following keys:
+        A dictionary with the adjusted metadata
     """
     adjustedData = {(l, r): {"node": theRMD[r]["node"], "y_min": theRMD[r]["y_min"], "y_max": theRMD[r]["y_max"],
                              "height": theRMD[r]["height"], "width": theRMD[r]["width"],

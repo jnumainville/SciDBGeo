@@ -16,7 +16,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
         summaryStatsCSV = The CSV path to write to
 
     Output:
-        An ordered dictionary with the following keys:
+        An ordered dictionary with timing information
     """
 
     start = timeit.default_timer()
@@ -66,7 +66,7 @@ def FocalAnalysis(sdbConn, arrayTable):
         arrayTable = Array to run analysis on
 
     Output:
-        Dictionary with timing information
+        An ordered dictionary with timing information
     """
 
     start = timeit.default_timer()
@@ -86,10 +86,11 @@ def TwoRasterAdd(sdbConn, arrayTable):
     This function will return the sum of the pixels in a SciDB Array
 
     Input:
-        sdbConn =
-        arrayTable =
+        sdbConn = The SCiDB connection to use
+        arrayTable = The table to use
 
     Output:
+        An ordered dictionary containing timing information
     """
 
     start = timeit.default_timer()
@@ -110,11 +111,12 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     This function will return the sum of the pixels in a SciDB Array
 
     Input:
-        sdbConn =
-        arrayTable =
-        pixelValue =
+        sdbConn = The SCiDB connection to use
+        arrayTable = The table to use
+        pixelValue = The type of the pixel
 
     Output:
+        An ordered dictionary containing timing information
     """
 
     start = timeit.default_timer()
@@ -136,16 +138,17 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
 
 def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
     """
-    This function will return the sum of the pixels in a SciDB Array
+    Reclassify the table
 
     Input:
-        sdbConn =
-        arrayTable =
-        oldValue =
-        newValue =
-        run =
+        sdbConn = The SCiDB connection to use
+        arrayTable = The table to use
+        oldValue = The old value that the table uses
+        newValue = The new  value to use with the table
+        run = The run that is in progress
 
     Output:
+        An ordered dictionary containing timing information
     """
 
     start = timeit.default_timer()
@@ -172,13 +175,13 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
 
 def localDatasetPrep(tableName=''):
     """
-    Description
+    This function preps the datasets glc_2000_clipped, meris_2010_clipped, nlcd_2006
 
     Input:
-        tableName =
+        tableName = the name to use for tables
 
     Output:
-
+        An ordered dictionary containing the array_table, pixelValue, and newPixel as keys
     """
     chunk_sizes = [500, 1000, 1500]  # ,2000,2500,3000,3500,4000]
     raster_tables = ["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006"]
@@ -207,22 +210,23 @@ def localDatasetPrep(tableName=''):
 
 def zonalDatasetPrep():
     """
-    Function will return all the possible combinations of dastes for analysis
+    Function will return all the possible combinations of dataset for analysis
     rasterTables = (raster dataset * tile size) 
     boundaryNames = All boundaries to test against
 
     Input:
+        None
 
     Output:
+        An ordered dictionary containing run information
     """
 
-    # TODO: ANONYMYZE
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped", "meris2015_clipped", "nlcd_2006_clipped"]
-    raster_paths = ["/home/04489/dhaynes/glc2000_clipped.tif", "/home/04489/dhaynes/meris_2010_clipped.tif",
-                    "/home/04489/dhaynes/nlcd_2006.tif"]
-    shapefiles = ["/group/shapefiles/4326/states.shp", "/group/shapefiles/4326/regions.shp",
-                  "/group/shapefiles/4326/counties.shp"]
+    raster_paths = ["REPLACE/glc2000_clipped.tif".format(rasterPath), "REPLACE/meris_2010_clipped.tif".format(rasterPath),
+                    "REPLACE/nlcd_2006.tif".format(rasterPath)]
+    shapefiles = ["REPLACE/states.shp".format(shapePath), "REPLACE/regions.shp".format(shapePath),
+                  "REPLACE/counties.shp".format(shapeP)]
 
     arrayTables = ["%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes]
     rasterPaths = [raster_path for raster_path in raster_paths for chunk in chunk_sizes]
@@ -240,10 +244,11 @@ def WriteFile(filePath, theDictionary):
     This function writes out the dictionary as csv
 
     Input:
-        filePath =
-        theDictionary =
+        filePath = Where to write the dictionary
+        theDictionary = The dictionary to write as csv
 
     Output:
+        None
     """
 
     thekeys = list(theDictionary.keys())
@@ -295,6 +300,10 @@ def argument_parser():
 
 
 if __name__ == '__main__':
+    """
+        Entry point for SciDB_analysis
+        This file contains the functions used for performing spatial analyses in SciDB
+    """
     args = argument_parser().parse_args()
 
     sdb = iquery()
