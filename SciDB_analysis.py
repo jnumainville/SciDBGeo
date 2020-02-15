@@ -208,7 +208,7 @@ def localDatasetPrep(tableName=''):
     return datasetRuns
 
 
-def zonalDatasetPrep():
+def zonalDatasetPrep(args):
     """
     Function will return all the possible combinations of dataset for analysis
     rasterTables = (raster dataset * tile size) 
@@ -221,12 +221,15 @@ def zonalDatasetPrep():
         An ordered dictionary containing run information
     """
 
+    raster_folder = args.r
+    shape_folder = args.s
+
     chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     array_names = ["glc2000_clipped", "meris2015_clipped", "nlcd_2006_clipped"]
-    raster_paths = ["REPLACE/glc2000_clipped.tif".format(rasterPath), "REPLACE/meris_2010_clipped.tif".format(rasterPath),
-                    "REPLACE/nlcd_2006.tif".format(rasterPath)]
-    shapefiles = ["REPLACE/states.shp".format(shapePath), "REPLACE/regions.shp".format(shapePath),
-                  "REPLACE/counties.shp".format(shapeP)]
+    raster_paths = ["{}/glc2000_clipped.tif".format(raster_folder), "{}/meris_2010_clipped.tif".format(raster_folder),
+                    "{}/nlcd_2006.tif".format(raster_folder)]
+    shapefiles = ["REPLACE/states.shp".format(shape_folder), "REPLACE/regions.shp".format(shape_folder),
+                  "REPLACE/counties.shp".format(shape_folder)]
 
     arrayTables = ["%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes]
     rasterPaths = [raster_path for raster_path in raster_paths for chunk in chunk_sizes]
@@ -279,6 +282,8 @@ def argument_parser():
 
     subparser = parser.add_subparsers(dest="command")
     analytic_subparser = subparser.add_parser('zonal')
+    analytic_subparser.add_argument('-r', help="Path to folder that contains rasters")
+    analytic_subparser.add_argument('-s', help="Path to folder that contains shape folders")
     analytic_subparser.set_defaults(func=zonalDatasetPrep)
 
     count_subparser = subparser.add_parser('count')
