@@ -215,7 +215,7 @@ def zonalDatasetPrep(args):
     boundaryNames = All boundaries to test against
 
     Input:
-        None
+       	args = Object containing r, the raster folder, and s, the shape folder
 
     Output:
         An ordered dictionary containing run information
@@ -281,6 +281,7 @@ def argument_parser():
     parser.add_argument("-csv", required=False, help="Output timing results into CSV file", dest="csv", default="None")
 
     subparser = parser.add_subparsers(dest="command")
+    subparser.required = True
     analytic_subparser = subparser.add_parser('zonal')
     analytic_subparser.add_argument('-r', help="Path to folder that contains rasters")
     analytic_subparser.add_argument('-s', help="Path to folder that contains shape folders")
@@ -310,7 +311,6 @@ if __name__ == '__main__':
         This file contains the functions used for performing spatial analyses in SciDB
     """
     args = argument_parser().parse_args()
-
     sdb = iquery()
     query = sdb.queryAFL("list('instances')")
     SciDBInstances = len(query.splitlines()) - 1
