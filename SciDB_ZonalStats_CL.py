@@ -4,7 +4,7 @@ A command line tool for conducting Zonal Statistics in SciDB
 """
 
 from osgeo import ogr, gdal
-import scidbpy, timeit, csv, argparse, os
+import scidb, timeit, csv, argparse, os
 from collections import OrderedDict
 import numpy as np
 import multiprocessing as mp
@@ -139,7 +139,7 @@ def GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, tempSciDBLoad,
 
     # Write the array in the correct location
     start = timeit.default_timer()
-    sdbquery = "insert(faster_redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format(
+    sdbquery = "insert(redimension(apply({A}, x, x1+{xOffSet}, y, y1+{yOffSet}, value, id), {B} ), {B})".format(
         A=tempRastName, B=tempArray, yOffSet=minY, xOffSet=minX)
     sdb.query(sdbquery)
     stop = timeit.default_timer()
@@ -525,7 +525,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             SciDBInstances = len(query.splitlines()) - 1
 
             tempRastName = 'p_zones'
-            binaryPath = '/storage'  # '/home/scidb/scidb_data/0'
+            binaryPath = '/home/dhaynes/scidb_data/0'
 
             pool = mp.Pool(SciDBInstances)
 

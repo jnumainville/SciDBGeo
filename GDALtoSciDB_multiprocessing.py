@@ -152,7 +152,9 @@ class RasterReader(object):
         except:
             print("*****  Array %s already exists. Removing ****" % rasterArrayName)
             sdb.query("remove(%s)" % rasterArrayName)
+            print("here2")
             sdb.query(myQuery)
+            print("here3")
 
         del sdb
 
@@ -639,5 +641,15 @@ if __name__ == '__main__':
 
     # Load the data in parallel if requested
     timeDictionary = MultiProcessLoading(RasterInformation, args.rasterPath, args.OutPath, args.SciDBLoadPath)
+    allTimesDictionary = None
     if not args.parallel:
         allTimesDictionary = GlobalRasterLoading(args.host, RasterInformation, timeDictionary)
+
+    if args.csv and allTimesDictionary != None: 
+        WriteFile(args.csv, allTimesDictionary)
+
+
+
+    stop = timeit.default_timer()
+
+    print("Finished. Time to complete %s minutes" % ((stop-start)/60))
