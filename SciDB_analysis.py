@@ -2,6 +2,8 @@ from scidb import iquery, Statements
 from SciDBParallel import *
 import os, timeit, csv
 from collections import OrderedDict
+import configparser
+import json
 
 
 def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
@@ -11,7 +13,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
 
     Input:
         sdbConn = SciDB instance to run statistics on
-        datset = The dataset to run the statistics on
+        dataset = The dataset to run the statistics on
         theRun = The run the program is currently on
         summaryStatsCSV = The CSV path to write to
 
@@ -183,9 +185,15 @@ def localDatasetPrep(tableName=''):
     Output:
         An ordered dictionary containing the array_table, pixelValue, and newPixel as keys
     """
-    chunk_sizes = [500, 1000, 1500]  # ,2000,2500,3000,3500,4000]
-    raster_tables = ["glc_2000_clipped", "meris_2010_clipped", "nlcd_2006"]
-    # "nlcd_2006_clipped"] #glc_2010_clipped_400 nlcd_2006_clipped_2500
+
+    config = configparser.ConfigParser()
+    config.read("config.ini")
+
+    def parse(s):
+        return json.loads(config.get("localDatasetPrep", s))
+
+    chunk_sizes = parse("chunk_sizes")
+    raster_tables = parse("raster_tables")
 
     if tableName:
         rasterTables = ["%s_%s_%s" % (raster, tableName, chunk) for raster in raster_tables for chunk in chunk_sizes]
@@ -208,28 +216,33 @@ def localDatasetPrep(tableName=''):
     return datasetRuns
 
 
-def zonalDatasetPrep(args):
+def zonalDatasetPrep(config):
     """
     Function will return all the possible combinations of dataset for analysis
     rasterTables = (raster dataset * tile size) 
     boundaryNames = All boundaries to test against
 
     Input:
-       	args = Object containing r, the raster folder, and s, the shape folder
+        None
 
     Output:
         An ordered dictionary containing run information
     """
 
-    raster_folder = args.r
-    shape_folder = args.s
+    config = configparser.ConfigParser()
+    config.read("config.ini")
 
-    chunk_sizes = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
-    array_names = ["glc2000_clipped", "meris2015_clipped", "nlcd_2006_clipped"]
-    raster_paths = ["{}/glc2000_clipped.tif".format(raster_folder), "{}/meris_2010_clipped.tif".format(raster_folder),
-                    "{}/nlcd_2006.tif".format(raster_folder)]
-    shapefiles = ["REPLACE/states.shp".format(shape_folder), "REPLACE/regions.shp".format(shape_folder),
-                  "REPLACE/counties.shp".format(shape_folder)]
+    def parse(s):
+        return json.loads(config.get("zonalDatasetPrep", s))
+
+    raster_folder = parse("raster_folder")
+    shape_folder = parse("shape_folder")
+
+    chunk_sizes = parse("chunk_sizes")
+    array_names = parse("array_names")
+    raster_paths = ["{}/{}".format(raster_folder, file) for file in parse("raster_files")]
+    shape_files = ["{}/{}".format(shape_folder, file) for file in parse("shape_files")]
+
 
     arrayTables = ["%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes]
     rasterPaths = [raster_path for raster_path in raster_paths for chunk in chunk_sizes]
@@ -237,7 +250,7 @@ def zonalDatasetPrep(args):
     datasetRuns = [OrderedDict([("shape_path", "%s/5070/%s" % ("/".join(s.split("/")[:3]), s.split("/")[-1])),
                                 ("array_table", a), ("raster_path", r)]) if "nlcd" in r else
                    OrderedDict([("shape_path", s), ("array_table", a), ("raster_path", r)]) for a, r in
-                   zip(arrayTables, rasterPaths) for s in shapefiles]
+                   zip(arrayTables, rasterPaths) for s in shape_files]
 
     return datasetRuns
 
@@ -283,8 +296,6 @@ def argument_parser():
     subparser = parser.add_subparsers(dest="command")
     subparser.required = True
     analytic_subparser = subparser.add_parser('zonal')
-    analytic_subparser.add_argument('-r', help="Path to folder that contains rasters")
-    analytic_subparser.add_argument('-s', help="Path to folder that contains shape folders")
     analytic_subparser.set_defaults(func=zonalDatasetPrep)
 
     count_subparser = subparser.add_parser('count')
