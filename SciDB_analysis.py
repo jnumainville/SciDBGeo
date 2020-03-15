@@ -48,7 +48,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
                                                      raster.lrY, raster.lrX, numDimensions, 1, summaryStatsCSV)
     stopSummaryStats = timeit.default_timer()
 
-    timed = OrderedDict([("connectionInfo", "XSEDE"), ("run", r),
+    timed = OrderedDict([("connectionInfo", "Connection"), ("run", r),
                          ("array_table", d["array_table"]), ("boundary_table", d["shape_path"]),
                          ("full_time", stopSummaryStats - start),
                          ("join_time", summaryStatTime), ("redimension_time", redimension_time),
@@ -146,7 +146,7 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
         sdbConn = The SCiDB connection to use
         arrayTable = The table to use
         oldValue = The old value that the table uses
-        newValue = The new  value to use with the table
+        newValue = The new value to use with the table
         run = The run that is in progress
 
     Output:
@@ -175,7 +175,7 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
     return timed
 
 
-def localDatasetPrep(tableName=''):
+def localDatasetPrep(config, tableName=''):
     """
     This function preps the datasets glc_2000_clipped, meris_2010_clipped, nlcd_2006
 
@@ -185,10 +185,6 @@ def localDatasetPrep(tableName=''):
     Output:
         An ordered dictionary containing the array_table, pixelValue, and newPixel as keys
     """
-
-    config = configparser.ConfigParser()
-    config.read("config.ini")
-
     def parse(s):
         return json.loads(config.get("localDatasetPrep", s))
 
@@ -220,10 +216,6 @@ def zonalDatasetPrep(config):
     Output:
         An ordered dictionary containing run information
     """
-
-    config = configparser.ConfigParser()
-    config.read("config.ini")
-
     def parse(s):
         return json.loads(config.get("zonalDatasetPrep", s))
 
@@ -238,10 +230,8 @@ def zonalDatasetPrep(config):
     arrayTables = ["%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes]
     rasterPaths = [raster_path for raster_path in raster_paths for chunk in chunk_sizes]
 
-    return [OrderedDict([("shape_path", "%s/5070/%s" % ("/".join(s.split("/")[:3]), s.split("/")[-1])),
-                                ("array_table", a), ("raster_path", r)]) if "nlcd" in r else
-                   OrderedDict([("shape_path", s), ("array_table", a), ("raster_path", r)]) for a, r in
-                   zip(arrayTables, rasterPaths) for s in shape_files]
+    return [OrderedDict([("shape_path", s), ("array_table", a), ("raster_path", r)]) for a, r in
+            zip(arrayTables, rasterPaths) for s in shape_files]
 
 
 def WriteFile(filePath, theDictionary):
@@ -310,19 +300,26 @@ if __name__ == '__main__':
         Entry point for SciDB_analysis
         This file contains the functions used for performing spatial analyses in SciDB
     """
+    config = configparser.ConfigParser()
+    config.read("config.ini")
+
+    def parse(s):
+        return json.loads(config.get("main", s))
+
     args = argument_parser().parse_args()
     sdb = iquery()
     query = sdb.queryAFL("list('instances')")
     SciDBInstances = len(query.splitlines()) - 1
 
-    runs = [1]  # ,2,3]
-    analytic = 1
-    filePath = '/group/scidb_zonal_all_vector_10_16_2018.csv'
-    rasterStatsCSV = '/mnt/zonalstats.csv'
+    runs = parse("runs")
+    # analytic does not appear to be used?
+    #analytic = 1
+    filePath = parse("filePath")
+    rasterStatsCSVBase = parse("rasterStatsCSVBase")
     if args.command == "overlap":
-        datasets = args.func('overlap')
+        datasets = args.func(config, 'overlap')
     else:
-        datasets = args.func()
+        datasets = args.func(config)
     timings = OrderedDict()
 
     for d in datasets:
@@ -330,8 +327,8 @@ if __name__ == '__main__':
         for r in runs:
             if args.command == "zonal":
                 print(d["raster_path"], d["shape_path"], d["array_table"])
-                rasterStatsCSV = '/mnt/zonalstats_%s_%s.csv' % (d["shape_path"].split("/")[-1].split(".")[0],
-                                                                d["array_table"])
+                rasterStatsCSV = '%s_%s_%s.csv' % (rasterStatsCSVBase, d["shape_path"].split("/")[-1].split(".")[0],
+                                                   d["array_table"])
                 timed = ZonalStatistics(sdb, d, r, rasterStatsCSV)
                 timings[(r, d["array_table"], d["shape_path"])] = timed
             elif args.command == "count":
@@ -354,6 +351,7 @@ if __name__ == '__main__':
         # Remove the parallel zone files after each dataset run
         if args.command == "zonal":
             for i in range(SciDBInstances):
+                #TODO: Move to config?
                 os.remove("/storage/%s/p_zones.scidb" % (i))
 
     if filePath:
