@@ -180,7 +180,7 @@ def localDatasetPrep(tableName=''):
     This function preps the datasets glc_2000_clipped, meris_2010_clipped, nlcd_2006
 
     Input:
-        tableName = the name to use for tables
+        tableName = the name of the table that
 
     Output:
         An ordered dictionary containing the array_table, pixelValue, and newPixel as keys
@@ -194,26 +194,18 @@ def localDatasetPrep(tableName=''):
 
     chunk_sizes = parse("chunk_sizes")
     raster_tables = parse("raster_tables")
+    pixel_values = parse("pixel_values")
 
     if tableName:
-        rasterTables = ["%s_%s_%s" % (raster, tableName, chunk) for raster in raster_tables for chunk in chunk_sizes]
+        return [OrderedDict([("array_table", "%s_%s_%s" % (raster, tableName, chunk)),
+                                    ("pixelValue", pixel),
+                                    ("newPixel", 1)])
+                       for raster, pixel in zip(raster_tables, pixel_values) for chunk in chunk_sizes]
     else:
-        rasterTables = ["%s_%s" % (raster, chunk) for raster in raster_tables for chunk in chunk_sizes]
-
-    datasetRuns = []
-    for r in rasterTables:
-        if "glc_2000_clipped" in r:
-            pixelValue = 16
-            reclassValues = {"oldPixel": 16, "newPixel": 1}
-        elif "meris_2010_clipped" in r:
-            pixelValue = 100
-            reclassValues = {"oldPixel": 100, "newPixel": 1}
-        elif "nlcd_2006" in r:
-            pixelValue = 21
-            reclassValues = {"oldPixel": 21, "newPixel": 1}
-        datasetRuns.append(OrderedDict([("array_table", r), ("pixelValue", pixelValue), ("newPixel", 1)]))
-
-    return datasetRuns
+        return [OrderedDict([("array_table", "%s_%s" % (raster, chunk)),
+                                    ("pixelValue", pixel),
+                                    ("newPixel", 1)])
+                       for raster, pixel in zip(raster_tables, pixel_values) for chunk in chunk_sizes]
 
 
 def zonalDatasetPrep(config):
@@ -243,16 +235,13 @@ def zonalDatasetPrep(config):
     raster_paths = ["{}/{}".format(raster_folder, file) for file in parse("raster_files")]
     shape_files = ["{}/{}".format(shape_folder, file) for file in parse("shape_files")]
 
-
     arrayTables = ["%s_%s" % (array, chunk) for array in array_names for chunk in chunk_sizes]
     rasterPaths = [raster_path for raster_path in raster_paths for chunk in chunk_sizes]
 
-    datasetRuns = [OrderedDict([("shape_path", "%s/5070/%s" % ("/".join(s.split("/")[:3]), s.split("/")[-1])),
+    return [OrderedDict([("shape_path", "%s/5070/%s" % ("/".join(s.split("/")[:3]), s.split("/")[-1])),
                                 ("array_table", a), ("raster_path", r)]) if "nlcd" in r else
                    OrderedDict([("shape_path", s), ("array_table", a), ("raster_path", r)]) for a, r in
                    zip(arrayTables, rasterPaths) for s in shape_files]
-
-    return datasetRuns
 
 
 def WriteFile(filePath, theDictionary):
