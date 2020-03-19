@@ -85,7 +85,7 @@ def FocalAnalysis(sdbConn, arrayTable):
 
 def TwoRasterAdd(sdbConn, arrayTable):
     """
-    This function will return the sum of the pixels in a SciDB Array
+    This function will add an array to itself 
 
     Input:
         sdbConn = The SCiDB connection to use
@@ -96,8 +96,8 @@ def TwoRasterAdd(sdbConn, arrayTable):
     """
 
     start = timeit.default_timer()
-
-    query = "aggregate(filter(%s, ), sum(value)" % (arrayTable)
+    #TODO: figure out query to add rasters
+    query = "" % (arrayTable)
     results = sdbConn.query(query)
 
     stop = timeit.default_timer()
@@ -122,10 +122,10 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
     """
 
     start = timeit.default_timer()
-    query = "SELECT count(value) from %s WHERE value = %s" % (arrayTable, pixelValue)
-    results = sdbConn.aql_query(query)
+    #query = "SELECT count(value) from %s WHERE value = %s" % (arrayTable, pixelValue)
+    #results = sdbConn.aql_query(query)
 
-    query = "aggregate(filter(%s, ), sum(value)" % (arrayTable, pixelValue)
+    query = "aggregate(filter(%s, value = %s), sum(value))" % (arrayTable, pixelValue)
     results = sdbConn.query(query)
 
     stop = timeit.default_timer()
@@ -343,7 +343,7 @@ if __name__ == '__main__':
                 timed = FocalAnalysis(sdb, d["array_table"])
                 timings[(r, d["array_table"])] = timed
                 timeit.time.sleep(120)
-            elif args.comand == "add":
+            elif args.command == "add":
                 timed = TwoRasterAdd(sdb, d["array_table"])
                 timings[(r, d["array_table"])] = timed
             print(timed)
