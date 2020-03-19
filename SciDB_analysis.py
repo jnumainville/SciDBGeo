@@ -177,9 +177,10 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
 
 def localDatasetPrep(config, tableName=''):
     """
-    This function preps the datasets glc_2000_clipped, meris_2010_clipped, nlcd_2006
+    This function preps the datasets
 
     Input:
+        config = the instance of a configuration file
         tableName = the name of the table that
 
     Output:
@@ -211,7 +212,7 @@ def zonalDatasetPrep(config):
     boundaryNames = All boundaries to test against
 
     Input:
-        None
+        config = the instance of a configuration file
 
     Output:
         An ordered dictionary containing run information
@@ -339,10 +340,12 @@ if __name__ == '__main__':
                 timed = Reclassify(sdb, d["array_table"], d["pixelValue"], d["newPixel"], 6)
                 timings[(r, d["array_table"])] = timed
             elif args.command == "focal" or args.command == "overlap":
-                timed = FocalAnalysis(sdb, d["array_table"], )
+                timed = FocalAnalysis(sdb, d["array_table"])
                 timings[(r, d["array_table"])] = timed
                 timeit.time.sleep(120)
-
+            elif args.comand == "add":
+                timed = TwoRasterAdd(sdb, d["array_table"])
+                timings[(r, d["array_table"])] = timed
             print(timed)
 
         if args.command == "overlap" or args.command == "focal":
