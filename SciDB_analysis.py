@@ -325,6 +325,7 @@ if __name__ == '__main__':
     for d in datasets:
         print(d)
         for r in runs:
+            timed = None
             if args.command == "zonal":
                 print(d["raster_path"], d["shape_path"], d["array_table"])
                 rasterStatsCSV = '%s_%s_%s.csv' % (rasterStatsCSVBase, d["shape_path"].split("/")[-1].split(".")[0],
