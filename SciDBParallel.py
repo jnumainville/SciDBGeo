@@ -562,6 +562,7 @@ class ZonalStats(object):
         rasterTransform = inRaster.GetGeoTransform()
         self.rasterProjection = inRaster.GetProjection()
         self.pixel_size = rasterTransform[1]
+        print(vectorPath)
         vector_dataset = ogr.Open(vectorPath)
         theLayer = vector_dataset.GetLayer()
         geomMin_X, geomMax_X, geomMin_Y, geomMax_Y = theLayer.GetExtent()
@@ -577,7 +578,7 @@ class ZonalStats(object):
         self.VectorWidth = abs(self.width)
 
         step = int(abs(self.tlY - self.lrY) / instances)
-        print("Each partition array dimensionsa are approximately %s lines, %s columns = %s pixels" %
+        print("Each partition array dimensions are approximately %s lines, %s columns = %s pixels" %
               (step, self.width, step * self.width))
         self.arrayMetaData = []
 

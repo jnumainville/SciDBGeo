@@ -23,7 +23,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
 
     start = timeit.default_timer()
     raster = ZonalStats(dataset["shape_path"], dataset["raster_path"], dataset["array_table"])
-    raster.RasterMetadata(dataset["raster_path"], dataset["shape_path"], raster.SciDBInstances, '/storage')
+    raster.RasterMetadata(dataset["raster_path"], dataset["shape_path"], raster.SciDBInstances, '/home/research/storage')
     stopPrep = timeit.default_timer()
     print(raster.geoTiffPath, raster.SciDBArrayName)
 
