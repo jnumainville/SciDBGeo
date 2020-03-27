@@ -85,19 +85,18 @@ def FocalAnalysis(sdbConn, arrayTable):
 
 def TwoRasterAdd(sdbConn, arrayTable):
     """
-    This function will add an array to itself 
+    This function will add an array to itself
 
     Input:
         sdbConn = The SCiDB connection to use
-        arrayTable = The table to use
+       	arrayTable = The table to use
 
     Output:
         An ordered dictionary containing timing information
     """
 
     start = timeit.default_timer()
-    #TODO: figure out query to add rasters
-    query = "" % (arrayTable)
+    query = "apply( join( apply(%s, x1, value), apply(%s, y1, value)), result, x1+y1)" % (arrayTable, arrayTable) 
     results = sdbConn.query(query)
 
     stop = timeit.default_timer()
