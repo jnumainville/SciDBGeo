@@ -562,7 +562,6 @@ class ZonalStats(object):
         rasterTransform = inRaster.GetGeoTransform()
         self.rasterProjection = inRaster.GetProjection()
         self.pixel_size = rasterTransform[1]
-        print(vectorPath)
         vector_dataset = ogr.Open(vectorPath)
         theLayer = vector_dataset.GetLayer()
         geomMin_X, geomMax_X, geomMin_Y, geomMax_Y = theLayer.GetExtent()
