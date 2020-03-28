@@ -34,7 +34,7 @@ def world2Pixel(geoMatrix, x, y):
     return abs(pixel), abs(line)
 
 
-def RasterizePolygon(inRasterPath, outRasterPath, vectorPath):
+def RasterizePolygon(inRasterPath, vectorPath):
     """
     This function will Rasterize the Polygon based off the inRasterPath provided. 
     This only creates a memory raster
@@ -42,7 +42,6 @@ def RasterizePolygon(inRasterPath, outRasterPath, vectorPath):
 
     Input:
         inRasterPath = The path where the raster is
-        outRasterPath = Where to write the raster (not currently used)
         vectorPath = The path to the vector dataset
 
     Output:
@@ -412,7 +411,7 @@ def ParallelProcessing(params):
         print(binaryPartitionPath)
 
 
-def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False):
+def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False, csvPath=None, binaryPath=None):
     """
     This function conducts zonal stats in SciDB
 
@@ -425,6 +424,8 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
         statsMode = Mode of analysis to conduct
         filePath = Path to CSV file
         verbose = Whether or not to use verbose version
+        csvPath = CSV path for options 2 and 3
+        binaryPath = path to store temporary binary files in for modes 4 and 5
 
     Output:
         None
@@ -443,7 +444,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
         rasterTransform = inRaster.GetGeoTransform()
         # Check the time for rasterization
         start = timeit.default_timer()
-        rasterizedArray = RasterizePolygon(rasterPath, r'/home/scidb/scidb_data/0/0/nothing.tiff', boundaryPath)
+        rasterizedArray = RasterizePolygon(rasterPath, boundaryPath)
         rasterValueDataType = rasterizedArray.dtype
         stop = timeit.default_timer()
         rasterizeTime = stop - start
@@ -475,7 +476,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
         elif statsMode == 2:
             # Use EquiJoin summary stats
-            csvPath = '/home/scidb/scidb_data/0/0/polygon.scidb'
             WriteMultiDimensionalArray(rasterizedArray, csvPath, ulX, ulY)
             tempRastName = csvPath.split('/')[-1].split('.')[0]
             tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
@@ -484,7 +484,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
         elif statsMode == 3:
             # Use GlobalJoin summary stats
-            csvPath = '/home/scidb/scidb_data/0/0/zones.scidb'
             WriteMultiDimensionalArray(rasterizedArray, csvPath)
             tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
             tempRastName = csvPath.split('/')[-1].split('.')[0]
@@ -498,7 +497,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
         elif statsMode == 4:
             # This is the serial version
             print("Serial Version of Zonal Stats")
-            binaryPath = '/home/scidb/scidb_data/0'  # /storage/0
             print("Converting to Binary")
             tempRastName = 's_zones'
             start = timeit.default_timer()
@@ -533,7 +531,6 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             SciDBInstances = len(query.splitlines()) - 1
 
             tempRastName = 'p_zones'
-            binaryPath = '/home/dhaynes/scidb_data/0'
 
             pool = mp.Pool(SciDBInstances)
 
@@ -625,6 +622,8 @@ def argument_parser():
     parser.add_argument('-v', required=False, action="store_true", default=False, dest='verbose')
     parser.add_argument('-Host', required=False, help="SciDB host for connection", dest="host",
                         default="http://localhost:8080")
+    parser.add_argument('-ZoneCSV', required=False, help='CSV path for options 2 and 3', dest='zoneCSV')
+    parser.add_argument('-Binary', required=False, help='Binary path for tmp files for options 4 and 5', dest='binary')
     return parser
 
 
@@ -644,6 +643,6 @@ if __name__ == '__main__':
             from scidbpy import connect
 
             sdb = connect(args.host)
-        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose)
+        ZonalStats(args.Runs, args.Shapefile, args.Raster, args.SciArray, sdb, args.mode, args.CSV, args.verbose, args.zoneCSV, args.binary)
     else:
         print(args.Shapefile, args.Raster)

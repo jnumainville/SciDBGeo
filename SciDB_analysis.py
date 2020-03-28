@@ -358,9 +358,12 @@ if __name__ == '__main__':
 
         # Remove the parallel zone files after each dataset run
         if args.command == "zonal":
+            # zonal information is stored in ZonalStatistics
+            def parse(s):
+                return json.loads(config.get("ZonalStatistics", s))
+            folder = parse("folder")
             for i in range(SciDBInstances):
-                #TODO: Move to config?
-                os.remove("/storage/%s/p_zones.scidb" % (i))
+                os.remove("%s/%s/p_zones.scidb" % (folder, i))
 
     if filePath:
         WriteFile(filePath, timings)
