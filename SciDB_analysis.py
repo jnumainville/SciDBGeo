@@ -21,9 +21,14 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
         An ordered dictionary with timing information
     """
 
+    def parse(s):
+        return json.loads(config.get("ZonalStatistics", s))
+
+    folder = parse("folder")
+
     start = timeit.default_timer()
     raster = ZonalStats(dataset["shape_path"], dataset["raster_path"], dataset["array_table"])
-    raster.RasterMetadata(dataset["raster_path"], dataset["shape_path"], raster.SciDBInstances, '/home/research/storage')
+    raster.RasterMetadata(dataset["raster_path"], dataset["shape_path"], raster.SciDBInstances, folder)
     stopPrep = timeit.default_timer()
     print(raster.geoTiffPath, raster.SciDBArrayName)
 

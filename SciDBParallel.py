@@ -409,7 +409,7 @@ class ZonalStats(object):
             None
         """
         self.tempRastName = 'p_zones'
-        self.binaryPath = r'%s' % storagePath  # '/storage' #'/home/scidb/scidb_data/0'
+        self.binaryPath = r'%s' % storagePath 
         self.RasterArray = self.RasterizePolygon(rasterPath, boundaryPath)
 
     def RasterizePolygon(self, inRasterPath, vectorPath):
@@ -816,7 +816,12 @@ def BigRasterization(inParams):
     vector_dataset = ogr.Open(vectorPath)
     theLayer = vector_dataset.GetLayer()
 
-    binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
+    folder = "%s/%s" % (dataStorePath, counter)
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+
+    binaryPartitionPath = "%s/p_zones.scidb" % folder
+
     if os.path.exists(binaryPartitionPath):
         print("****Removing file****")
         os.remove(binaryPartitionPath)
@@ -848,7 +853,12 @@ def BigRasterization(inParams):
                   (counter, p, memY, memX, height, bandArray.shape))
             del theRast
 
-            binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
+            folder = "%s/%s" % (dataStorePath, counter)
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+
+            binaryPartitionPath = "%s/p_zones.scidb" % folder
+
             ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset + h.min())
     else:
 
@@ -866,7 +876,12 @@ def BigRasterization(inParams):
         bandArray = band.ReadAsArray()
         del theRast
 
-        binaryPartitionPath = "%s/%s/p_zones.scidb" % (dataStorePath, counter)
+        folder = "%s/%s" % (dataStorePath, counter)
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+
+        binaryPartitionPath = "%s/p_zones.scidb" % folder
+
         ArrayToBinary(bandArray, binaryPartitionPath, 'mask', offset)
 
     return counter, offset, bandArray, binaryPartitionPath

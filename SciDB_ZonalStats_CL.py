@@ -374,7 +374,11 @@ def WriteBinaryFile(params):
     binaryPath = params[0]
     datastore, chunk = params[1]
 
-    binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
+    folder = "%s/%s" % (binaryPath, datastore)
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+
+    binaryPartitionPath = "%s/p_zones.scidb" % folder
     with open(binaryPartitionPath, 'wb') as fileout:
         fileout.write(chunk.ravel().tobytes())
 
@@ -397,7 +401,11 @@ def ParallelProcessing(params):
     yOffSet = params[1]
     datastore, arrayChunk = params[2]
 
-    binaryPartitionPath = "%s/%s/p_zones.scidb" % (binaryPath, datastore)
+    folder = "%s/%s" % (binaryPath, datastore)
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+
+    binaryPartitionPath = "%s/p_zones.scidb" % folder
 
     with open(binaryPartitionPath, 'wb') as fileout:
         fileout.write(ArrayToBinary(arrayChunk, yOffSet).ravel().tobytes())
