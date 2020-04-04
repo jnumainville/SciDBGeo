@@ -38,7 +38,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
 
         sdb_statements = Statements(sdbConn)
 
-        theAttribute = 'id:%s' % (datapackage[0])  #
+        theAttribute = 'id:%s' % (datapackage[0])  
         startLoadTime = timeit.default_timer()
         sdb_statements.CreateLoadArray('boundary', theAttribute, 2)
         sdb_statements.LoadOneDimensionalArray(-1, 'boundary', theAttribute, 1, 'p_zones.scidb')

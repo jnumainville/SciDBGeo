@@ -628,6 +628,7 @@ class ZonalStats(object):
         dim = r'([a-zA-Z0-9]+(=[0-9]:[0-9]+:[0-9]+:[0-9]+))'
         alldimensions = re.findall(dim, results)
         thedimensions = [d[0] for d in alldimensions]
+        print("DIMENSIONS {}".format(thedimensions))
         if len(thedimensions) > 2:
             dimensions = "; ".join(thedimensions[1:])
         else:

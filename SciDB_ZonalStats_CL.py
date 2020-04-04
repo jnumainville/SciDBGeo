@@ -461,28 +461,8 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
         queryTime = None
         transferTime = None
-        if statsMode == 1:
-            # Transfering Raster Array to SciDB
-            polygonSciDBArray = None
-            chunksize = int(input("Please input chunksize: "))
-            if isinstance(chunksize, int):
-                start = timeit.default_timer()
-                polygonSciDBArray = sdb.from_array(rasterizedArray, instance_id=0, persistent=False, chunk_size=
-                chunksize)
-                stop = timeit.default_timer()
-                transferTime = stop - start
 
-            queryTime = SubArray_SummaryStats(sdb, polygonSciDBArray.name, SciDBArray, ulX, ulY, lrX, lrY, verbose)
-
-        elif statsMode == 2:
-            # Use EquiJoin summary stats
-            WriteMultiDimensionalArray(rasterizedArray, csvPath, ulX, ulY)
-            tempRastName = csvPath.split('/')[-1].split('.')[0]
-            tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
-            transferTime, queryTime = EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType,
-                                                            tempSciDBLoad, ulY, ulX, lrY, lrX, verbose)
-
-        elif statsMode == 3:
+        if statsMode == 3:
             # Use GlobalJoin summary stats
             WriteMultiDimensionalArray(rasterizedArray, csvPath)
             tempSciDBLoad = '/'.join(csvPath.split('/')[:-1])
@@ -506,6 +486,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
 
             print("Writing Binary File")
             start = timeit.default_timer()
+            print("BIN %s" % binaryPath)
             binaryLoadPath = "%s/s_zones.scidb" % binaryPath
             with open(binaryLoadPath, 'wb') as fileout:
                 fileout.write(binaryArray.ravel().tobytes())
