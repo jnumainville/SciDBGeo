@@ -317,8 +317,7 @@ if __name__ == '__main__':
     SciDBInstances = len(query.splitlines()) - 1
 
     runs = parse("runs")
-    # analytic does not appear to be used?
-    #analytic = 1
+
     filePath = parse("filePath")
     rasterStatsCSVBase = parse("rasterStatsCSVBase")
     if args.command == "overlap":
