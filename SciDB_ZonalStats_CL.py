@@ -411,7 +411,8 @@ def ParallelProcessing(params):
         print(binaryPartitionPath)
 
 
-def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False, csvPath=None, binaryPath=None):
+def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMode=1, filePath=None, verbose=False,
+               csvPath=None, binaryPath=None):
     """
     This function conducts zonal stats in SciDB
 
@@ -540,17 +541,18 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             stop = timeit.default_timer()
             print("Took: %s" % (stop - start))
 
-            print("Loading...")
-            start = timeit.default_timer()
-            binaryLoadPath = "p_zones.scidb"
-            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
-            stop = timeit.default_timer()
-            print("Took: %s" % (stop - start))
+            for i in len(chunkedArrays):
+                print("Loading {}...".format(i))
+                start = timeit.default_timer()
+                binaryLoadPath = "{}/{}/p_zones.scidb".format(binaryPath, i)
+                LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
+                stop = timeit.default_timer()
+                print("Took: %s" % (stop - start))
 
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName,
                                                               ulY, ulX, lrY, lrX, verbose)
 
-        print("Zonal Analyis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t + 1))
+        print("Zonal Analysis time %s, for file %s, Query run %s " % (queryTime, boundaryPath, t + 1))
         if verbose:
             print("Redimension Time: %s" % transferTime)
         outDictionary[theTest] = OrderedDict([("test", theTest), ("SciDBArrayName", SciDBArray),
