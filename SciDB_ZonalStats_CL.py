@@ -541,7 +541,7 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             stop = timeit.default_timer()
             print("Took: %s" % (stop - start))
 
-            for i in len(chunkedArrays):
+            for i in range(0, len(chunkedArrays)):
                 print("Loading {}...".format(i))
                 start = timeit.default_timer()
                 binaryLoadPath = "{}/{}/p_zones.scidb".format(binaryPath, i)

@@ -615,7 +615,6 @@ class ZonalStats(object):
             The dimensions of the mask
         """
         import re
-        tempArray = "mask"
 
         results = self.sdb.queryAFL("show(%s)" % self.SciDBArrayName)
         results = results.decode("utf-8")
