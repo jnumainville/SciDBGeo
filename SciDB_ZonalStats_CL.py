@@ -541,13 +541,12 @@ def ZonalStats(NumberofTests, boundaryPath, rasterPath, SciDBArray, sdb, statsMo
             stop = timeit.default_timer()
             print("Took: %s" % (stop - start))
 
-            for i in range(0, len(chunkedArrays)):
-                print("Loading {}...".format(i))
-                start = timeit.default_timer()
-                binaryLoadPath = "{}/{}/p_zones.scidb".format(binaryPath, i)
-                LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
-                stop = timeit.default_timer()
-                print("Took: %s" % (stop - start))
+            print("Loading...")
+            start = timeit.default_timer()
+            binaryLoadPath = "p_zones.scidb"
+            LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, "y1", "x1", verbose, -1)
+            stop = timeit.default_timer()
+            print("Took: %s" % (stop-start))
 
             transferTime, queryTime = GlobalJoin_SummaryStats(sdb, SciDBArray, rasterValueDataType, '', tempRastName,
                                                               ulY, ulX, lrY, lrX, verbose)
