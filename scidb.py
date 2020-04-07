@@ -131,7 +131,7 @@ class iquery(object):
             theArray = The array to run versions on
 
         Output:
-            The versions
+            The versions in a list
         """
 
         scidbArguments = """iquery -aq "versions(%s)"; """ % theArray
@@ -414,7 +414,6 @@ class Statements(object):
         return thedimensions
 
 
-# TODO: determine if necessary
 class DataTypes(object):
 
     def __init__(self):

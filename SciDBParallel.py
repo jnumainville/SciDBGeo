@@ -234,7 +234,6 @@ class RasterLoader(object):
                             maxPixels=10000000, attribute='value', band=1):
         """
         This function gathers all the metadata necessary
-        The loops are 
 
         {node: {"node": node, "y_min": min(heightRange), "y_max": max(heightRange),"height": len(heightRange), \
         "width": self.width ,"datastore": dataStorePath, "filepath": RasterPath, "attribute": self.AttributeString, \
@@ -365,7 +364,7 @@ class ZonalStats(object):
 
     def __init__(self, boundaryPath, rasterPath, SciDBArray):
         """
-        Initialization
+        Initialization of a ZonalStats object
 
         Input:
             boundaryPath = Path of the boundary
@@ -406,7 +405,7 @@ class ZonalStats(object):
              boundaryPath = The path of the boundary
              rasterPath = The path of the raster
              SciDBArray = The array to process on
-             storagePath = The path to store the arrat
+             storagePath = The path to store the array
 
         Output:
             None
@@ -681,7 +680,7 @@ class ZonalStats(object):
 
         Input:
             SciDBArray = The SciDB array to process on
-            tempRastName = The name of the temporary array
+            tempRastName = The name of the temporary array (not currently used)
             tempArray = The array to join on
             minY = The minimum Y to join on
             minX = The minimum X to join on
@@ -798,8 +797,18 @@ def BigRasterization(inParams):
     Function for rasterizing in parallel
 
     Input:
-        inParams = List of parameters including x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter,
-        offset, and dataStorePath
+        inParams = List of parameters including the following
+            x = The x dimension to use
+            y = The y dimension to use
+            height = The height of a raster dataset to process on
+            width = The width of a raster dataset to process on
+            pixel_1 = First pixel to use for transformation
+            pixel_2 = Second pixel to use for transformation
+            projection = The projection to use
+            vectorPath = Path to the vector to use
+            counter = Counter to use for writing
+            offset = Offset to use for processing
+            dataStorePath = Where to write the data files to
 
     Output:
         Tuple containing counter, offset, bandArray, binaryPartitionPath
@@ -916,9 +925,9 @@ def ArrayToBinary(theArray, binaryFilePath, attributeName='value', yOffSet=0, xO
 
         # Oneliner for writing out the file
         # Add this to make it a csv tofile(binaryFilePath), "," and modify the open statement to 'w'
-        np.core.records.fromarrays([column_index, row_index, theArray.ravel()], dtype=[('y', 'int64'), ('x', 'int64'),
-                                                                                       (attributeName, theArray.dtype)]) \
-            .ravel().tofile(fileout)
+        np.core.records.fromarrays(
+            [column_index, row_index, theArray.ravel()],
+            dtype=[('y', 'int64'), ('x', 'int64'), (attributeName, theArray.dtype)]).ravel().tofile(fileout)
 
     del column_index, row_index, theArray
 
@@ -1111,7 +1120,7 @@ def AdjustMetaData(loops, theRMD):
         theRMD = The raster metadata
 
     Output:
-        A dictionary with the adjusted metadata
+        A dictionary with the adjusted metadata, same format as the input
     """
     adjustedData = {(l, r): {"node": theRMD[r]["node"], "y_min": theRMD[r]["y_min"], "y_max": theRMD[r]["y_max"],
                              "height": theRMD[r]["height"], "width": theRMD[r]["width"],

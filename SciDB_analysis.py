@@ -18,7 +18,7 @@ def ZonalStatistics(sdbConn, dataset, theRun, summaryStatsCSV=None):
         summaryStatsCSV = The CSV path to write to
 
     Output:
-        An ordered dictionary with timing information
+        An ordered dictionary with timing information, used for writing
     """
 
     def parse(s):
@@ -74,7 +74,7 @@ def FocalAnalysis(sdbConn, arrayTable):
         arrayTable = Array to run analysis on
 
     Output:
-        An ordered dictionary with timing information
+        An ordered dictionary with timing information, used for writing
     """
 
     start = timeit.default_timer()
@@ -98,7 +98,7 @@ def TwoRasterAdd(sdbConn, arrayTable):
        	arrayTable = The table to use
 
     Output:
-        An ordered dictionary containing timing information
+        An ordered dictionary containing timing information, used for writing
     """
 
     start = timeit.default_timer()
@@ -123,7 +123,7 @@ def CountPixels(sdbConn, arrayTable, pixelValue):
         pixelValue = The type of the pixel
 
     Output:
-        An ordered dictionary containing timing information
+        An ordered dictionary containing timing information, used for writing
     """
 
     start = timeit.default_timer()
@@ -155,7 +155,7 @@ def Reclassify(sdbConn, arrayTable, oldValue, newValue, run=1):
         run = The run that is in progress
 
     Output:
-        An ordered dictionary containing timing information
+        An ordered dictionary containing timing information, used for writing
     """
 
     start = timeit.default_timer()
@@ -189,7 +189,7 @@ def localDatasetPrep(config, tableName=''):
         tableName = the name of the table that
 
     Output:
-        An ordered dictionary containing the array_table, pixelValue, and newPixel as keys
+        An ordered dictionary containing the array_table, pixelValue, and newPixel as keys, used for writing
     """
     def parse(s):
         return json.loads(config.get("localDatasetPrep", s))
@@ -220,7 +220,7 @@ def zonalDatasetPrep(config):
         config = the instance of a configuration file
 
     Output:
-        An ordered dictionary containing run information
+        An ordered dictionary containing run information, used for writing
     """
     def parse(s):
         return json.loads(config.get("zonalDatasetPrep", s))

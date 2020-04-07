@@ -251,9 +251,11 @@ def LoadArraytoSciDB(sdb, tempRastName, binaryLoadPath, rasterValueDataType, dim
         sdb = sdb connection
         tempRastName = Name for loading raster dataset
         binaryLoadPath = path for loading binary scidbdata
-        rasterValeDataType - Numpy value type
+        rasterValeDataType = Numpy value type
         dim1 = name of the dimension (default = x) 
         dim2 = name of the dimension (default = y)
+        verbose = Whether or not to print results
+        loadMode = Which mode to use for SciDB loading
 
     output:
         Tuple of complete path to where the file is written
@@ -304,7 +306,7 @@ def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, te
         minX = Minimum X to process on
         maxX = Maximum X to process on
         maxY = Maximum Y to process on
-        verbose = Whether or not to use verbose version
+        verbose = Whether or not to write results
 
     Output:
         The loading time and query time in a tuple
@@ -320,7 +322,8 @@ def EquiJoin_SummaryStats(sdb, SciDBArray, tempRastName, rasterValueDataType, te
     sdb.query(sdbquery)
     stop = timeit.default_timer()
     queryTime = stop - start
-    if verbose: print(sdbquery, queryTime)
+    if verbose:
+        print(sdbquery, queryTime)
 
     return loadTime, queryTime
 
@@ -338,7 +341,7 @@ def SubArray_SummaryStats(sdb, polygonSciDBArrayName, SciDBArray, minX, minY, ma
         minX = Minimum X to process on
         maxX = Maximum X to process on
         maxY = Maximum Y to process on
-        verbose = Whether or not to use verbose version
+        verbose = Whether or not to write results
 
     Output:
         The time to query
