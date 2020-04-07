@@ -11,7 +11,7 @@ class RasterLoader(object):
     def __init__(self, RasterPath, scidbArray, attribute, chunksize, dataStorePath, tiles=None, maxPixels=10000000,
                  yOffSet=0, overlap=0):
         """
-        Initialize the class RasterReader
+        Initialize the class RasterLoader
 
         Input:
             RasterPath = Path to the raster
@@ -104,6 +104,9 @@ class RasterLoader(object):
         Input: 
             scidbInstance = SciDB Instance IDs
             rasterFilePath = Absolute Path to the GeoTiff
+            outPath = Path to write to
+            loadPath = Path to load from
+            band = Band to use
 
         Output:
             Yield a tuple in the following format:
@@ -381,7 +384,7 @@ class ZonalStats(object):
         self.geoTiffPath = rasterPath
         self.SciDBArrayName = SciDBArray
 
-    def __SciDBInstances(self, ):
+    def __SciDBInstances(self):
         """
         Determine SciDB Instances available
 
@@ -795,7 +798,7 @@ def BigRasterization(inParams):
     Function for rasterizing in parallel
 
     Input:
-        inParams = List of parameters including x, y, height, width, pixel_1, pixel_2, projection, vectorPAth, counter,
+        inParams = List of parameters including x, y, height, width, pixel_1, pixel_2, projection, vectorPath, counter,
         offset, and dataStorePath
 
     Output:
